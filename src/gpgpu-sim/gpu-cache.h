@@ -40,6 +40,15 @@
 
 #define MAX_DEFAULT_CACHE_SIZE_MULTIBLIER 4
 
+enum cache_prefetch_mode {
+    NO_PREFETCH=0,
+    ALWAYS_PREFETCH,
+    PREFETCH_ON_MISS,
+    TAGGED_PREFETCH,
+    STRIDED_PREFETCH,
+};
+static enum cache_prefetch_mode DATA_PREFETCH_MODE = PREFETCH_ON_MISS;
+
 enum cache_block_state {
     INVALID=0,
     RESERVED,
@@ -227,6 +236,10 @@ struct line_cache_block: public cache_block_t  {
 			 printf("m_block_addr is %llu, status = %u\n", m_block_addr, m_status);
 		}
 
+        // Tagged prefetching related getters
+        bool get_tag_bit() {
+            return m_tag_bit;
+        }
 
 private:
 	    unsigned long long     m_alloc_time;
@@ -236,6 +249,10 @@ private:
 	    bool m_ignore_on_fill_status;
 	    bool m_set_modified_on_fill;
 	    bool m_readable;
+
+	    // Tagged prefetching related variables
+	    bool m_tag_bit;
+
 };
 
 struct sector_cache_block : public cache_block_t {
@@ -1385,6 +1402,12 @@ protected:
                            mem_fetch* mf,
                            unsigned time,
                            std::list<cache_event>& events );
+
+    enum cache_request_status prefetch_next_block( new_addr_type addr,
+                                                   mem_fetch *mf,
+                                                   unsigned time,
+                                                   std::list<cache_event> &events );
+
 
 protected:
     mem_fetch_allocator *m_memfetch_creator;

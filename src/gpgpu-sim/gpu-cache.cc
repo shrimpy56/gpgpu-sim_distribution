@@ -1681,6 +1681,49 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
     return access_status;
 }
 
+enum cache_request_status
+data_cache::prefetch_next_block( new_addr_type addr,
+                                               mem_fetch *mf,
+                                               unsigned time,
+                                               std::list<cache_event> &events )
+{
+    const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
+                                              mf->get_addr() + m_config.get_atom_sz(),
+                                              m_config.get_atom_sz(),
+                                              mf->is_write(),
+                                              mf->get_access_warp_mask(),
+                                              mf->get_access_byte_mask(),
+                                              mf->get_access_sector_mask());
+
+    mem_fetch *n_mf = new mem_fetch(*ma,
+                                    NULL,
+                                    mf->get_ctrl_size(),
+                                    mf->get_wid(),
+                                    mf->get_sid(),
+                                    mf->get_tpc(),
+                                    mf->get_mem_config(),
+                                    mf);
+
+    assert(n_mf->get_data_size() <= m_config.get_atom_sz());
+    bool wr = n_mf->get_is_write();
+    new_addr_type block_addr = m_config.block_addr(n_mf->get_addr());
+    unsigned cache_index = (unsigned) -1;
+    enum cache_request_status probe_status
+            = m_tag_array->probe(block_addr, cache_index, n_mf, true);
+    std::list<cache_event> tmp_events;
+    enum cache_request_status access_status
+            = process_tag_probe_using_prefetch_on_miss(wr, probe_status, n_mf->get_addr(), cache_index, n_mf, time,
+                                                       tmp_events);
+
+    m_stats.inc_stats(n_mf->get_access_type(),
+                      m_stats.select_stats_status(probe_status, access_status));
+    m_stats.inc_stats_pw(n_mf->get_access_type(),
+                         m_stats.select_stats_status(probe_status, access_status));
+
+    return access_status;
+}
+
+
 // Both the L1 and L2 currently use the same access function.
 // Differentiation between the two caches is done through configuration
 // of caching policies.
@@ -1718,57 +1761,46 @@ l1_cache::access( new_addr_type addr,
                   unsigned time,
                   std::list<cache_event> &events )
 {
-    //return data_cache::access( addr, mf, time, events );
-
-    //Always prefetch
-    //TODO
-
-    // Prefetch-on-miss
-    enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
-    if (access_status == MISS)
+    switch (DATA_PREFETCH_MODE)
     {
-        //prefetch next block
-        const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
-                                                  mf->get_addr() + m_config.get_atom_sz(),
-                                                  m_config.get_atom_sz(),
-                                                  mf->is_write(),
-                                                  mf->get_access_warp_mask(),
-                                                  mf->get_access_byte_mask(),
-                                                  mf->get_access_sector_mask());
-
-        mem_fetch *n_mf = new mem_fetch(*ma,
-                                        NULL,
-                                        mf->get_ctrl_size(),
-                                        mf->get_wid(),
-                                        mf->get_sid(),
-                                        mf->get_tpc(),
-                                        mf->get_mem_config(),
-                                        mf);
-
-        assert(n_mf->get_data_size() <= m_config.get_atom_sz());
-        bool wr = n_mf->get_is_write();
-        new_addr_type block_addr = m_config.block_addr(n_mf->get_addr());
-        unsigned cache_index = (unsigned) -1;
-        enum cache_request_status probe_status
-                = m_tag_array->probe(block_addr, cache_index, n_mf, true);
-        std::list<cache_event> events;
-        enum cache_request_status access_status
-                = process_tag_probe_using_prefetch_on_miss(wr, probe_status, n_mf->get_addr(), cache_index, n_mf, time,
-                                                           events);
-
-        m_stats.inc_stats(n_mf->get_access_type(),
-                          m_stats.select_stats_status(probe_status, access_status));
-        m_stats.inc_stats_pw(n_mf->get_access_type(),
-                             m_stats.select_stats_status(probe_status, access_status));
+        case ALWAYS_PREFETCH:
+            //Always prefetch
+            {
+                enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
+                prefetch_next_block(addr, mf, time, events);
+                return access_status;
+            }
+            break;
+        case PREFETCH_ON_MISS:
+            // Prefetch-on-miss
+            {
+                enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
+                if (access_status == MISS) {
+                    //prefetch next block
+                    prefetch_next_block(addr, mf, time, events);
+                }
+                return access_status;
+            }
+            break;
+        case TAGGED_PREFETCH:
+            //Tagged prefetch
+            {
+                return data_cache::access( addr, mf, time, events );
+                //TODO
+            }
+            break;
+        case STRIDED_PREFETCH:
+            //Strided prefetch
+            {
+                return data_cache::access( addr, mf, time, events );
+                //TODO
+            }
+            break;
+        default:
+            //No prefetch
+            return data_cache::access( addr, mf, time, events );
+            break;
     }
-
-    return access_status;
-
-    //Tagged prefetch
-    //TODO
-
-    //Strided prefetch
-    //TODO
 }
 
 // The l2 cache access function calls the base data_cache access
