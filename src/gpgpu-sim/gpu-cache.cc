@@ -1629,6 +1629,58 @@ data_cache::process_tag_probe( bool wr,
     return access_status;
 }
 
+// Prefetch-on-miss process
+enum cache_request_status
+data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
+                               enum cache_request_status probe_status,
+                               new_addr_type addr,
+                               unsigned cache_index,
+                               mem_fetch* mf,
+                               unsigned time,
+                               std::list<cache_event>& events )
+{
+    cache_request_status access_status = probe_status;
+    if(wr)
+    { // Write
+        if(probe_status == HIT)
+        {
+            //Do nothing
+        }else if ((probe_status != RESERVATION_FAIL)
+                || (probe_status == RESERVATION_FAIL && m_config.m_write_alloc_policy == NO_WRITE_ALLOCATE))
+        {
+            access_status = (this->*m_wr_miss)( addr,
+                                       cache_index,
+                                       mf, time, events, probe_status );
+        }
+        else
+        {
+        	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+        	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+        }
+    }
+    else
+    { // Read
+        if(probe_status == HIT)
+        {
+            //Do nothing
+        }
+        else if ( probe_status != RESERVATION_FAIL )
+        {
+            access_status = (this->*m_rd_miss)( addr,
+                                       cache_index,
+                                       mf, time, events, probe_status );
+        }
+        else
+        {
+        	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+        	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+        }
+    }
+
+    m_bandwidth_management.use_data_port(mf, access_status, events); 
+    return access_status;
+}
+
 // Both the L1 and L2 currently use the same access function.
 // Differentiation between the two caches is done through configuration
 // of caching policies.
@@ -1666,7 +1718,57 @@ l1_cache::access( new_addr_type addr,
                   unsigned time,
                   std::list<cache_event> &events )
 {
-    return data_cache::access( addr, mf, time, events );
+    //return data_cache::access( addr, mf, time, events );
+
+    //Always prefetch
+    //TODO
+
+    // Prefetch-on-miss
+    enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
+    if (access_status == MISS)
+    {
+        //prefetch next block
+        const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
+                                                  mf->get_addr() + m_config.get_atom_sz(),
+                                                  m_config.get_atom_sz(),
+                                                  mf->is_write(),
+                                                  mf->get_access_warp_mask(),
+                                                  mf->get_access_byte_mask(),
+                                                  mf->get_access_sector_mask());
+
+        mem_fetch *n_mf = new mem_fetch(*ma,
+                                        NULL,
+                                        mf->get_ctrl_size(),
+                                        mf->get_wid(),
+                                        mf->get_sid(),
+                                        mf->get_tpc(),
+                                        mf->get_mem_config(),
+                                        mf);
+
+        assert(n_mf->get_data_size() <= m_config.get_atom_sz());
+        bool wr = n_mf->get_is_write();
+        new_addr_type block_addr = m_config.block_addr(n_mf->get_addr());
+        unsigned cache_index = (unsigned) -1;
+        enum cache_request_status probe_status
+                = m_tag_array->probe(block_addr, cache_index, n_mf, true);
+        std::list<cache_event> events;
+        enum cache_request_status access_status
+                = process_tag_probe_using_prefetch_on_miss(wr, probe_status, n_mf->get_addr(), cache_index, n_mf, time,
+                                                           events);
+
+        m_stats.inc_stats(n_mf->get_access_type(),
+                          m_stats.select_stats_status(probe_status, access_status));
+        m_stats.inc_stats_pw(n_mf->get_access_type(),
+                             m_stats.select_stats_status(probe_status, access_status));
+    }
+
+    return access_status;
+
+    //Tagged prefetch
+    //TODO
+
+    //Strided prefetch
+    //TODO
 }
 
 // The l2 cache access function calls the base data_cache access

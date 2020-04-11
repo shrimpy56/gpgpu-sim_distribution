@@ -1376,6 +1376,16 @@ protected:
                            unsigned time,
                            std::list<cache_event>& events );
 
+    // perform prefetch on miss
+    enum cache_request_status
+        process_tag_probe_using_prefetch_on_miss( bool wr,
+                           enum cache_request_status status,
+                           new_addr_type addr,
+                           unsigned cache_index,
+                           mem_fetch* mf,
+                           unsigned time,
+                           std::list<cache_event>& events );
+
 protected:
     mem_fetch_allocator *m_memfetch_creator;
 
