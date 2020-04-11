@@ -1640,25 +1640,25 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
                                std::list<cache_event>& events )
 {
     cache_request_status access_status = probe_status;
-    if(wr)
-    { // Write
-        if(probe_status == HIT)
-        {
-            //Do nothing
-        }else if ((probe_status != RESERVATION_FAIL)
-                || (probe_status == RESERVATION_FAIL && m_config.m_write_alloc_policy == NO_WRITE_ALLOCATE))
-        {
-            access_status = (this->*m_wr_miss)( addr,
-                                       cache_index,
-                                       mf, time, events, probe_status );
-        }
-        else
-        {
-        	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
-        	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
-        }
-    }
-    else
+//    if(wr)
+//    { // Write
+//        if(probe_status == HIT)
+//        {
+//            //Do nothing
+//        }else if ((probe_status != RESERVATION_FAIL)
+//                || (probe_status == RESERVATION_FAIL && m_config.m_write_alloc_policy == NO_WRITE_ALLOCATE))
+//        {
+//            access_status = (this->*m_wr_miss)( addr,
+//                                       cache_index,
+//                                       mf, time, events, probe_status );
+//        }
+//        else
+//        {
+//        	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+//        	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+//        }
+//    }
+//    else
     { // Read
         if(probe_status == HIT)
         {
