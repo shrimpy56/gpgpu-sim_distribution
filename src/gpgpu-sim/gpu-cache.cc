@@ -1688,7 +1688,7 @@ data_cache::prefetch_next_block( new_addr_type addr,
                                                std::list<cache_event> &events )
 {
     const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
-                                              mf->get_addr() + m_config.get_atom_sz(),
+                                              get_next_nth_block_addr(mf->get_addr(), 1),
                                               m_config.get_atom_sz(),
                                               mf->is_write(),
                                               mf->get_access_warp_mask(),
@@ -1761,46 +1761,82 @@ l1_cache::access( new_addr_type addr,
                   unsigned time,
                   std::list<cache_event> &events )
 {
+    enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
+
     switch (DATA_PREFETCH_MODE)
     {
         case ALWAYS_PREFETCH:
             //Always prefetch
             {
-                enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
                 prefetch_next_block(addr, mf, time, events);
-                return access_status;
             }
             break;
         case PREFETCH_ON_MISS:
             // Prefetch-on-miss
             {
-                enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
                 if (access_status == MISS) {
                     //prefetch next block
                     prefetch_next_block(addr, mf, time, events);
                 }
-                return access_status;
             }
             break;
         case TAGGED_PREFETCH:
             //Tagged prefetch
             {
-                return data_cache::access( addr, mf, time, events );
-                //TODO
+                new_addr_type block_addr = m_config.block_addr(addr);
+                unsigned cache_index = (unsigned)-1;
+                enum cache_request_status probe_status
+                        = m_tag_array->probe( block_addr, cache_index, mf, true);
+                line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
+                if (!block) break;
+
+                if (access_status == HIT)
+                {
+                    // prefetched data
+                    if (block->get_tag_bit() == false)
+                    {
+                        block->set_tag_bit(true);
+
+                        //prefetch
+                        prefetch_next_block(addr, mf, time, events);
+
+                        //set tag to false(0)
+                        new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf->get_addr(), 1));
+                        unsigned cache_index = (unsigned)-1;
+                        enum cache_request_status probe_status
+                                = m_tag_array->probe( block_addr, cache_index, mf, true);
+                        line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
+
+                        block->set_tag_bit(false);
+                    }
+                }
+                else if (access_status == MISS)
+                {
+                    prefetch_next_block(addr, mf, time, events);
+
+                    //set tag to false(0)
+                    new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf->get_addr(), 1));
+                    unsigned cache_index = (unsigned)-1;
+                    enum cache_request_status probe_status
+                            = m_tag_array->probe( block_addr, cache_index, mf, true);
+                    line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
+
+                    block->set_tag_bit(false);
+                }
             }
             break;
         case STRIDED_PREFETCH:
             //Strided prefetch
             {
-                return data_cache::access( addr, mf, time, events );
                 //TODO
             }
             break;
         default:
             //No prefetch
-            return data_cache::access( addr, mf, time, events );
             break;
     }
+
+    return access_status;
 }
 
 // The l2 cache access function calls the base data_cache access

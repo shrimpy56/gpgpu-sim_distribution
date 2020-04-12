@@ -155,6 +155,7 @@ struct line_cache_block: public cache_block_t  {
 	        m_ignore_on_fill_status = false;
 	        m_set_modified_on_fill = false;
 	        m_readable = true;
+            m_tag_bit = true;
 	    }
 	    void allocate( new_addr_type tag, new_addr_type block_addr, unsigned time, mem_access_sector_mask_t sector_mask)
 	    {
@@ -166,6 +167,7 @@ struct line_cache_block: public cache_block_t  {
 	        m_status=RESERVED;
 	        m_ignore_on_fill_status = false;
 	        m_set_modified_on_fill = false;
+            m_tag_bit = true;
 	    }
 		void fill( unsigned time, mem_access_sector_mask_t sector_mask )
 	    {
@@ -236,7 +238,10 @@ struct line_cache_block: public cache_block_t  {
 			 printf("m_block_addr is %llu, status = %u\n", m_block_addr, m_status);
 		}
 
-        // Tagged prefetching related getters
+        // Tagged prefetching getters & setters
+        bool set_tag_bit(bool bit) {
+	        m_tag_bit = bit;
+        }
         bool get_tag_bit() {
             return m_tag_bit;
         }
@@ -834,6 +839,8 @@ public:
 	void update_cache_parameters(cache_config &config);
 	void add_pending_line(mem_fetch *mf);
 	void remove_pending_line(mem_fetch *mf);
+
+    cache_block_t **get_cache_block() {return m_lines;}
 protected:
     // This constructor is intended for use only from derived classes that wish to
     // avoid unnecessary memory allocation that takes place in the
@@ -1407,7 +1414,11 @@ protected:
                                                    mem_fetch *mf,
                                                    unsigned time,
                                                    std::list<cache_event> &events );
-
+protected:
+    new_addr_type get_next_nth_block_addr(new_addr_type addr, int block_num = 1)
+    {
+        return addr + m_config.get_atom_sz() * block_num;
+    }
 
 protected:
     mem_fetch_allocator *m_memfetch_creator;
