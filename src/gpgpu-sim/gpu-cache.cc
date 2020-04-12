@@ -1659,7 +1659,8 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
 //        }
 //    }
 //    else
-    if (!wr)
+    if (wr) return access_status;
+    
     { // Read
         if(probe_status == HIT)
         {
