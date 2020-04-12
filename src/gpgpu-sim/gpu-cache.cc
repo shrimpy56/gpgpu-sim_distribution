@@ -1666,9 +1666,38 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
         }
         else if ( probe_status != RESERVATION_FAIL )
         {
-            access_status = (this->*m_rd_miss)( addr,
-                                       cache_index,
-                                       mf, time, events, probe_status );
+            if(miss_queue_full(1)) {
+                // cannot handle request this cycle
+                // (might need to generate two requests)
+                m_stats.inc_fail_stats(mf->get_access_type(), MISS_QUEUE_FULL);
+                access_status = RESERVATION_FAIL;
+            }
+            else
+            {
+                new_addr_type block_addr = m_config.block_addr(addr);
+                bool do_miss = false;
+                bool wb = false;
+                evicted_block_info evicted;
+                send_read_request( addr,
+                                   block_addr,
+                                   cache_index,
+                                   mf, time, do_miss, wb, evicted, events, false, false);
+
+                if( do_miss ){
+                    // If evicted block is modified and not a write-through
+                    // (already modified lower level)
+//                    if(wb && (m_config.m_write_policy != WRITE_THROUGH) ){
+//                        mem_fetch *wb = m_memfetch_creator->alloc(evicted.m_block_addr,
+//                                                                  m_wrbk_type,evicted.m_modified_size,true);
+//                        send_write_request(wb, WRITE_BACK_REQUEST_SENT, time, events);
+//                    }
+                    access_status = MISS;
+                }
+                else
+                {
+                    access_status = RESERVATION_FAIL;
+                }
+            }
         }
         else
         {
