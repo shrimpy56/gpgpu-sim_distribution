@@ -1659,6 +1659,7 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
 //        }
 //    }
 //    else
+    if (!wr)
     { // Read
         if(probe_status == HIT)
         {
@@ -1686,11 +1687,11 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
                 if( do_miss ){
                     // If evicted block is modified and not a write-through
                     // (already modified lower level)
-//                    if(wb && (m_config.m_write_policy != WRITE_THROUGH) ){
-//                        mem_fetch *wb = m_memfetch_creator->alloc(evicted.m_block_addr,
-//                                                                  m_wrbk_type,evicted.m_modified_size,true);
-//                        send_write_request(wb, WRITE_BACK_REQUEST_SENT, time, events);
-//                    }
+                    if(wb && (m_config.m_write_policy != WRITE_THROUGH) ){
+                        mem_fetch *wb = m_memfetch_creator->alloc(evicted.m_block_addr,
+                                                                  m_wrbk_type,evicted.m_modified_size,true);
+                        send_write_request(wb, WRITE_BACK_REQUEST_SENT, time, events);
+                    }
                     access_status = MISS;
                 }
                 else
