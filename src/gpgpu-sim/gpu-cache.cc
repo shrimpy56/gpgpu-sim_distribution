@@ -1659,8 +1659,7 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
 //        }
 //    }
 //    else
-    //if (wr) return access_status;
-
+    if (!wr)
     { // Read
         if(probe_status == HIT)
         {
@@ -1706,9 +1705,10 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
         	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
         	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
         }
+
+        m_bandwidth_management.use_data_port(mf, access_status, events);
     }
 
-    m_bandwidth_management.use_data_port(mf, access_status, events); 
     return access_status;
 }
 
