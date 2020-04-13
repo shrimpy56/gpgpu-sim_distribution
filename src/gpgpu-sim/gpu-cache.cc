@@ -1738,8 +1738,8 @@ data_cache::prefetch_next_block( new_addr_type addr,
                                                std::list<cache_event> &events )
 {
     const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
-                                              get_next_nth_block_addr(mf->get_addr(), 1),
-                                              m_config.get_atom_sz(),
+                                              mf->get_addr()+mf->get_data_size(),//TODO: get_next_nth_block_addr(mf->get_addr(), 1),
+                                              mf->get_data_size(),
                                               mf->is_write(),
                                               mf->get_access_warp_mask(),
                                               mf->get_access_byte_mask(),
@@ -1824,9 +1824,12 @@ l1_cache::access( new_addr_type addr,
         case PREFETCH_ON_MISS:
             // Prefetch-on-miss
             {
-                if (access_status == MISS) {
-                    //prefetch next block
-                    prefetch_next_block(addr, mf, time, events);
+                //TODO: remove it
+                if (!mf->is_write()) {
+                    if (access_status == MISS) {
+                        //prefetch next block
+                        prefetch_next_block(addr, mf, time, events);
+                    }
                 }
             }
             break;
