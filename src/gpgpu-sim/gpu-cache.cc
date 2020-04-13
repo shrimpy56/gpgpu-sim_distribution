@@ -1661,52 +1661,71 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
 //    else
     if (!wr)
     { // Read
-        if(probe_status == HIT)
-        {
-            //Do nothing
-        }
-        else if ( probe_status != RESERVATION_FAIL )
-        {
-            if(miss_queue_full(1)) {
-                // cannot handle request this cycle
-                // (might need to generate two requests)
-                m_stats.inc_fail_stats(mf->get_access_type(), MISS_QUEUE_FULL);
-                access_status = RESERVATION_FAIL;
-            }
-            else
-            {
-                new_addr_type block_addr = m_config.block_addr(addr);
-                bool do_miss = false;
-                bool wb = false;
-                evicted_block_info evicted;
-                send_read_request( addr,
-                                   block_addr,
-                                   cache_index,
-                                   mf, time, do_miss, wb, evicted, events, true, true);
 
-                if( do_miss ){
-                    // If evicted block is modified and not a write-through
-                    // (already modified lower level)
-//                    if(wb && (m_config.m_write_policy != WRITE_THROUGH) ){
-//                        mem_fetch *wb = m_memfetch_creator->alloc(evicted.m_block_addr,
-//                                                                  m_wrbk_type,evicted.m_modified_size,true);
-//                        send_write_request(wb, WRITE_BACK_REQUEST_SENT, time, events);
-//                    }
-                    access_status = MISS;
-                }
+        new_addr_type block_addr = m_config.block_addr(addr);
+        unsigned cache_index = (unsigned)-1;
+        enum cache_request_status cache_status = RESERVATION_FAIL;
+        if ( probe_status == HIT ) {
+            cache_status = m_tag_array->access(block_addr,time,cache_index,mf); // update LRU state
+        }else if ( probe_status != RESERVATION_FAIL ) {
+            if(!miss_queue_full(0)){
+                bool do_miss=false;
+                send_read_request(addr, block_addr, cache_index, mf, time, do_miss, events, true, false);
+                if(do_miss)
+                    cache_status = MISS;
                 else
-                {
-                    access_status = RESERVATION_FAIL;
-                }
+                    cache_status = RESERVATION_FAIL;
+            }else{
+                cache_status = RESERVATION_FAIL;
+                m_stats.inc_fail_stats(mf->get_access_type(), MISS_QUEUE_FULL);
             }
+        }else {
+            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
         }
-        else
-        {
-        	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
-        	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
-        }
+        return cache_status;
 
-        m_bandwidth_management.use_data_port(mf, access_status, events);
+
+//        if(probe_status == HIT)
+//        {
+//            //Do nothing
+//        }
+//        else if ( probe_status != RESERVATION_FAIL )
+//        {
+//            if(miss_queue_full(1)) {
+//                // cannot handle request this cycle
+//                // (might need to generate two requests)
+//                m_stats.inc_fail_stats(mf->get_access_type(), MISS_QUEUE_FULL);
+//                return RESERVATION_FAIL;
+//            }
+//
+//            new_addr_type block_addr = m_config.block_addr(addr);
+//            bool do_miss = false;
+//            bool wb = false;
+//            evicted_block_info evicted;
+//            send_read_request( addr,
+//                               block_addr,
+//                               cache_index,
+//                               mf, time, do_miss, wb, evicted, events, true, false);
+//
+//            if( do_miss ){
+//                // If evicted block is modified and not a write-through
+//                // (already modified lower level)
+//                if(wb && (m_config.m_write_policy != WRITE_THROUGH) ){
+//                    mem_fetch *wb = m_memfetch_creator->alloc(evicted.m_block_addr,
+//                                                              m_wrbk_type,evicted.m_modified_size,true);
+//                    send_write_request(wb, WRITE_BACK_REQUEST_SENT, time, events);
+//                }
+//                return MISS;
+//            }
+//            return RESERVATION_FAIL;
+//        }
+//        else
+//        {
+//        	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+//        	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+//        }
+//
+//        m_bandwidth_management.use_data_port(mf, access_status, events);
     }
 
     return access_status;
@@ -1746,10 +1765,10 @@ data_cache::prefetch_next_block( new_addr_type addr,
             = process_tag_probe_using_prefetch_on_miss(wr, probe_status, n_mf->get_addr(), cache_index, n_mf, time,
                                                        tmp_events);
 
-    m_stats.inc_stats(n_mf->get_access_type(),
-                      m_stats.select_stats_status(probe_status, access_status));
-    m_stats.inc_stats_pw(n_mf->get_access_type(),
-                         m_stats.select_stats_status(probe_status, access_status));
+//    m_stats.inc_stats(n_mf->get_access_type(),
+//                      m_stats.select_stats_status(probe_status, access_status));
+//    m_stats.inc_stats_pw(n_mf->get_access_type(),
+//                         m_stats.select_stats_status(probe_status, access_status));
 
     return access_status;
 }
