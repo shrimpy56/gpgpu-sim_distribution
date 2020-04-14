@@ -1661,14 +1661,12 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
 //    else
     if (!wr)
     { // Read
-
         new_addr_type block_addr = m_config.block_addr(addr);
-        unsigned cache_index = (unsigned)-1;
         enum cache_request_status cache_status = RESERVATION_FAIL;
         if ( probe_status == HIT ) {
-            cache_status = m_tag_array->access(block_addr,time,cache_index,mf); // update LRU state
+            //cache_status = m_tag_array->access(block_addr,time,cache_index,mf); // update LRU state
         }else if ( probe_status != RESERVATION_FAIL ) {
-            if(!miss_queue_full(0)){
+            if(!miss_queue_full(1)){
                 bool do_miss=false;
                 send_read_request(addr, block_addr, cache_index, mf, time, do_miss, events, true, false);
                 if(do_miss)
@@ -1737,13 +1735,13 @@ data_cache::prefetch_next_block( new_addr_type addr,
                                                unsigned time,
                                                std::list<cache_event> &events )
 {
+    unsigned cache_index = (unsigned)-1;
+    m_tag_array->probe( addr, cache_index, mf, true);
+
     const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
-                                              mf->get_addr(),//+mf->get_data_size(),//TODO: get_next_nth_block_addr(mf->get_addr(), 1),
+                                              mf->get_addr()+m_tag_array->get_cache_block()[cache_index]->get_modified_size(),//TODO: get_next_nth_block_addr(mf->get_addr(), 1),
                                               mf->get_data_size(),
-                                              mf->is_write(),
-                                              mf->get_access_warp_mask(),
-                                              mf->get_access_byte_mask(),
-                                              mf->get_access_sector_mask());
+                                              mf->is_write());
 
     mem_fetch *n_mf = new mem_fetch(*ma,
                                     NULL,
@@ -1751,15 +1749,14 @@ data_cache::prefetch_next_block( new_addr_type addr,
                                     mf->get_wid(),
                                     mf->get_sid(),
                                     mf->get_tpc(),
-                                    mf->get_mem_config(),
-                                    mf);
+                                    mf->get_mem_config());
 
     assert(n_mf->get_data_size() <= m_config.get_atom_sz());
     bool wr = n_mf->get_is_write();
     new_addr_type block_addr = m_config.block_addr(n_mf->get_addr());
-    unsigned cache_index = (unsigned) -1;
-    enum cache_request_status probe_status
-            = m_tag_array->probe(block_addr, cache_index, n_mf, true);
+    cache_index = (unsigned) -1;
+    enum cache_request_status probe_status = m_tag_array->probe(block_addr, cache_index, n_mf, true);
+
     std::list<cache_event> tmp_events;
     enum cache_request_status access_status
             = process_tag_probe_using_prefetch_on_miss(wr, probe_status, n_mf->get_addr(), cache_index, n_mf, time,
