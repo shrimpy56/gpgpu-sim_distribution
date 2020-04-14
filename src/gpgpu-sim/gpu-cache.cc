@@ -1741,7 +1741,10 @@ data_cache::prefetch_next_block( new_addr_type addr,
     const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
                                               mf->get_addr()+m_tag_array->get_cache_block()[cache_index]->get_modified_size(),//TODO: get_next_nth_block_addr(mf->get_addr(), 1),
                                               mf->get_data_size(),
-                                              mf->is_write());
+                                              mf->is_write(),
+                                              mf->get_access_warp_mask(),
+                                              mf->get_access_byte_mask(),
+                                              mf->get_access_sector_mask());
 
     mem_fetch *n_mf = new mem_fetch(*ma,
                                     NULL,
