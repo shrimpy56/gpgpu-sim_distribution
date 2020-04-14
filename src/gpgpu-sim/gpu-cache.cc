@@ -1640,49 +1640,58 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
                                std::list<cache_event>& events )
 {
     cache_request_status access_status = probe_status;
-//    if(wr)
-//    { // Write
-//        if(probe_status == HIT)
-//        {
-//            //Do nothing
-//        }else if ((probe_status != RESERVATION_FAIL)
-//                || (probe_status == RESERVATION_FAIL && m_config.m_write_alloc_policy == NO_WRITE_ALLOCATE))
-//        {
-//            access_status = (this->*m_wr_miss)( addr,
-//                                       cache_index,
-//                                       mf, time, events, probe_status );
-//        }
-//        else
-//        {
-//        	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
-//        	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
-//        }
-//    }
-//    else
-    if (!wr)
-    { // Read
-        new_addr_type block_addr = m_config.block_addr(addr);
-        enum cache_request_status cache_status = RESERVATION_FAIL;
-        if ( probe_status == HIT ) {
-            //cache_status = m_tag_array->access(block_addr,time,cache_index,mf); // update LRU state
-        }else if ( probe_status != RESERVATION_FAIL ) {
-            if(!miss_queue_full(1)){
-                bool do_miss=false;
-                send_read_request(addr, block_addr, cache_index, mf, time, do_miss, events, true, false);
-                if(do_miss)
-                    cache_status = MISS;
-                else
-                    cache_status = RESERVATION_FAIL;
-            }else{
-                cache_status = RESERVATION_FAIL;
-                m_stats.inc_fail_stats(mf->get_access_type(), MISS_QUEUE_FULL);
-            }
+
+    if(wr){ // Write
+        if(probe_status == HIT){
+            //Do nothing
+        }else if ( (probe_status != RESERVATION_FAIL) || (probe_status == RESERVATION_FAIL && m_config.m_write_alloc_policy == NO_WRITE_ALLOCATE) ) {
+            access_status = (this->*m_wr_miss)( addr,
+                                                cache_index,
+                                                mf, time, events, probe_status );
         }else {
+            //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
             m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
         }
-        return cache_status;
+    }else{ // Read
+        if(probe_status == HIT){
+            //Do nothing
+        }else if ( probe_status != RESERVATION_FAIL ) {
+            access_status = (this->*m_rd_miss)( addr,
+                                                cache_index,
+                                                mf, time, events, probe_status );
+        }else {
+            //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+        }
+    }
 
+    m_bandwidth_management.use_data_port(mf, access_status, events);
+    return access_status;
 
+    // right version
+//    { // Read
+//        new_addr_type block_addr = m_config.block_addr(addr);
+//        enum cache_request_status cache_status = RESERVATION_FAIL;
+//        if ( probe_status == HIT ) {
+//            //cache_status = m_tag_array->access(block_addr,time,cache_index,mf); // update LRU state
+//        }else if ( probe_status != RESERVATION_FAIL ) {
+//            if(!miss_queue_full(1)){
+//                bool do_miss=false;
+//                send_read_request(addr, block_addr, cache_index, mf, time, do_miss, events, true, false);
+//                if(do_miss)
+//                    cache_status = MISS;
+//                else
+//                    cache_status = RESERVATION_FAIL;
+//            }else{
+//                cache_status = RESERVATION_FAIL;
+//                m_stats.inc_fail_stats(mf->get_access_type(), MISS_QUEUE_FULL);
+//            }
+//        }else {
+//            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+//        }
+//        return cache_status;
+
+//version 2
 //        if(probe_status == HIT)
 //        {
 //            //Do nothing
@@ -1724,9 +1733,9 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
 //        }
 //
 //        m_bandwidth_management.use_data_port(mf, access_status, events);
-    }
-
-    return access_status;
+//    }
+//
+//    return access_status;
 }
 
 new_addr_type data_cache::get_next_nth_block_addr(mem_fetch *mf, int block_num)
@@ -1829,13 +1838,12 @@ l1_cache::access( new_addr_type addr,
         case PREFETCH_ON_MISS:
             // Prefetch-on-miss
             {
-                //TODO: remove it
-                if (!mf->is_write()) {
+                //if (!mf->is_write()) {
                     if (access_status == MISS) {
                         //prefetch next block
                         prefetch_next_block(addr, mf, time, events);
                     }
-                }
+                //}
             }
             break;
         case TAGGED_PREFETCH:
