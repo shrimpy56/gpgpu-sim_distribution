@@ -1867,7 +1867,7 @@ l1_cache::access( new_addr_type addr,
                         prefetch_next_block(addr, mf, time, events);
 
                         //set tag to false(0)
-                        new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf->get_addr(), 1));
+                        new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf, 1));
                         unsigned cache_index = (unsigned)-1;
                         enum cache_request_status probe_status
                                 = m_tag_array->probe( block_addr, cache_index, mf, true);
@@ -1881,7 +1881,7 @@ l1_cache::access( new_addr_type addr,
                     prefetch_next_block(addr, mf, time, events);
 
                     //set tag to false(0)
-                    new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf->get_addr(), 1));
+                    new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf, 1));
                     unsigned cache_index = (unsigned)-1;
                     enum cache_request_status probe_status
                             = m_tag_array->probe( block_addr, cache_index, mf, true);
