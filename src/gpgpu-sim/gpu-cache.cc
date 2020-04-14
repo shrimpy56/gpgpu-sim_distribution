@@ -1729,17 +1729,22 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
     return access_status;
 }
 
+new_addr_type data_cache::get_next_nth_block_addr(mem_fetch *mf, int block_num)
+{
+    unsigned cache_index = (unsigned)-1;
+    m_tag_array->probe( mf->get_addr(), cache_index, mf, true);
+
+    return mf->get_addr() + m_tag_array->get_cache_block()[cache_index]->get_modified_size() * block_num;
+}
+
 enum cache_request_status
 data_cache::prefetch_next_block( new_addr_type addr,
                                                mem_fetch *mf,
                                                unsigned time,
                                                std::list<cache_event> &events )
 {
-    unsigned cache_index = (unsigned)-1;
-    m_tag_array->probe( addr, cache_index, mf, true);
-
     const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
-                                              mf->get_addr()+m_tag_array->get_cache_block()[cache_index]->get_modified_size(),//TODO: get_next_nth_block_addr(mf->get_addr(), 1),
+                                              get_next_nth_block_addr(mf, 1),
                                               mf->get_data_size(),
                                               mf->is_write(),
                                               mf->get_access_warp_mask(),
@@ -1757,7 +1762,7 @@ data_cache::prefetch_next_block( new_addr_type addr,
     assert(n_mf->get_data_size() <= m_config.get_atom_sz());
     bool wr = n_mf->get_is_write();
     new_addr_type block_addr = m_config.block_addr(n_mf->get_addr());
-    cache_index = (unsigned) -1;
+    unsigned cache_index = (unsigned) -1;
     enum cache_request_status probe_status = m_tag_array->probe(block_addr, cache_index, n_mf, true);
 
     std::list<cache_event> tmp_events;

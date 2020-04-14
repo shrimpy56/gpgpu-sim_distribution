@@ -1415,10 +1415,7 @@ protected:
                                                    unsigned time,
                                                    std::list<cache_event> &events );
 protected:
-    new_addr_type get_next_nth_block_addr(new_addr_type addr, int block_num = 1)
-    {
-        return addr + m_config.get_atom_sz() * block_num;
-    }
+    new_addr_type get_next_nth_block_addr(mem_fetch *mf, int block_num = 1);
 
 protected:
     mem_fetch_allocator *m_memfetch_creator;
