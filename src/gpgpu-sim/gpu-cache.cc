@@ -1865,29 +1865,32 @@ l1_cache::access( new_addr_type addr,
 
                         //prefetch
                         enum cache_request_status prefetch_status = prefetch_next_block(addr, mf, time, events);
-                        RESERVATION_FAIL
+                        if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                        {
+                            //set tag to false(0)
+                            new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf, 1));
+                            unsigned cache_index = (unsigned)-1;
+                            enum cache_request_status probe_status
+                                    = m_tag_array->probe( block_addr, cache_index, mf, true);
+                            line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
+                            block->set_tag_bit(false);
+                        }
+                    }
+                }
+                else if (access_status == MISS)
+                {
+                    enum cache_request_status prefetch_status = prefetch_next_block(addr, mf, time, events);
+
+                    if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                    {
                         //set tag to false(0)
                         new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf, 1));
                         unsigned cache_index = (unsigned)-1;
                         enum cache_request_status probe_status
                                 = m_tag_array->probe( block_addr, cache_index, mf, true);
                         line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
-
                         block->set_tag_bit(false);
                     }
-                }
-                else if (access_status == MISS)
-                {
-                    prefetch_next_block(addr, mf, time, events);
-
-                    //set tag to false(0)
-                    new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf, 1));
-                    unsigned cache_index = (unsigned)-1;
-                    enum cache_request_status probe_status
-                            = m_tag_array->probe( block_addr, cache_index, mf, true);
-                    line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
-
-                    block->set_tag_bit(false);
                 }
             }
             break;
