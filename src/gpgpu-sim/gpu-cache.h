@@ -47,7 +47,7 @@ enum cache_prefetch_mode {
     TAGGED_PREFETCH,
     STRIDED_PREFETCH,
 };
-static enum cache_prefetch_mode DATA_PREFETCH_MODE = PREFETCH_ON_MISS;
+static enum cache_prefetch_mode DATA_PREFETCH_MODE = ALWAYS_PREFETCH;
 
 enum cache_block_state {
     INVALID=0,
