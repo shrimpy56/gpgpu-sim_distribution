@@ -1639,59 +1639,15 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
                                unsigned time,
                                std::list<cache_event>& events )
 {
-    cache_request_status access_status = probe_status;
-
-    if(wr){ // Write
-        if(probe_status == HIT){
-            //Do nothing
-        }else if ( (probe_status != RESERVATION_FAIL) || (probe_status == RESERVATION_FAIL && m_config.m_write_alloc_policy == NO_WRITE_ALLOCATE) ) {
-            access_status = (this->*m_wr_miss)( addr,
-                                                cache_index,
-                                                mf, time, events, probe_status );
-        }else {
-            //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
-            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
-        }
-    }else{ // Read
-        if(probe_status == HIT){
-            //Do nothing
-        }else if ( probe_status != RESERVATION_FAIL ) {
-            access_status = (this->*m_rd_miss)( addr,
-                                                cache_index,
-                                                mf, time, events, probe_status );
-        }else {
-            //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
-            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
-        }
+    // We test on Volta GPU architecture, which use NO_WRITE_ALLOCATE policy on write miss
+    // (Simply send write request to lower level memory), so we do not need to prefetch any data.
+    if (wr)
+    {
+        return RESERVATION_FAIL;
     }
 
-    m_bandwidth_management.use_data_port(mf, access_status, events);
-    return access_status;
+    cache_request_status access_status = probe_status;
 
-    // right version
-//    { // Read
-//        new_addr_type block_addr = m_config.block_addr(addr);
-//        enum cache_request_status cache_status = RESERVATION_FAIL;
-//        if ( probe_status == HIT ) {
-//            //cache_status = m_tag_array->access(block_addr,time,cache_index,mf); // update LRU state
-//        }else if ( probe_status != RESERVATION_FAIL ) {
-//            if(!miss_queue_full(1)){
-//                bool do_miss=false;
-//                send_read_request(addr, block_addr, cache_index, mf, time, do_miss, events, true, false);
-//                if(do_miss)
-//                    cache_status = MISS;
-//                else
-//                    cache_status = RESERVATION_FAIL;
-//            }else{
-//                cache_status = RESERVATION_FAIL;
-//                m_stats.inc_fail_stats(mf->get_access_type(), MISS_QUEUE_FULL);
-//            }
-//        }else {
-//            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
-//        }
-//        return cache_status;
-
-//version 2
 //        if(probe_status == HIT)
 //        {
 //            //Do nothing
@@ -1728,14 +1684,52 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
 //        }
 //        else
 //        {
-//        	//the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
-//        	m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+//            //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+//            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
 //        }
 //
 //        m_bandwidth_management.use_data_port(mf, access_status, events);
 //    }
 //
 //    return access_status;
+
+        if(probe_status == HIT){
+            //Do nothing
+        }else if ( probe_status != RESERVATION_FAIL ) {
+            access_status = (this->*m_rd_miss)( addr,
+                                                cache_index,
+                                                mf, time, events, probe_status );
+
+        }else {
+            //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+        }
+
+    m_bandwidth_management.use_data_port(mf, access_status, events);
+    return access_status;
+
+    // right read-only version
+//    { // Read
+//        new_addr_type block_addr = m_config.block_addr(addr);
+//        enum cache_request_status cache_status = RESERVATION_FAIL;
+//        if ( probe_status == HIT ) {
+//            //cache_status = m_tag_array->access(block_addr,time,cache_index,mf); // update LRU state
+//        }else if ( probe_status != RESERVATION_FAIL ) {
+//            if(!miss_queue_full(1)){
+//                bool do_miss=false;
+//                send_read_request(addr, block_addr, cache_index, mf, time, do_miss, events, true, false);
+//                if(do_miss)
+//                    cache_status = MISS;
+//                else
+//                    cache_status = RESERVATION_FAIL;
+//            }else{
+//                cache_status = RESERVATION_FAIL;
+//                m_stats.inc_fail_stats(mf->get_access_type(), MISS_QUEUE_FULL);
+//            }
+//        }else {
+//            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+//        }
+//        return cache_status;
 }
 
 new_addr_type data_cache::get_next_nth_block_addr(mem_fetch *mf, int block_num)
@@ -1752,6 +1746,15 @@ data_cache::prefetch_next_block( new_addr_type addr,
                                                unsigned time,
                                                std::list<cache_event> &events )
 {
+    bool wr = mf->get_is_write();
+
+    // We test on Volta GPU architecture, which use NO_WRITE_ALLOCATE policy on write miss
+    // (Simply send write request to lower level memory), so we do not need to prefetch any data.
+    if (wr)
+    {
+        return RESERVATION_FAIL;
+    }
+
     const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
                                               get_next_nth_block_addr(mf, 1),
                                               mf->get_data_size(),
@@ -1769,7 +1772,6 @@ data_cache::prefetch_next_block( new_addr_type addr,
                                     mf->get_mem_config());
 
     assert(n_mf->get_data_size() <= m_config.get_atom_sz());
-    bool wr = n_mf->get_is_write();
     new_addr_type block_addr = m_config.block_addr(n_mf->get_addr());
     unsigned cache_index = (unsigned) -1;
     enum cache_request_status probe_status = m_tag_array->probe(block_addr, cache_index, n_mf, true);
@@ -1838,12 +1840,10 @@ l1_cache::access( new_addr_type addr,
         case PREFETCH_ON_MISS:
             // Prefetch-on-miss
             {
-                //if (!mf->is_write()) {
-                    if (access_status == MISS) {
-                        //prefetch next block
-                        prefetch_next_block(addr, mf, time, events);
-                    }
-                //}
+                if (access_status == MISS) {
+                    //prefetch next block
+                    prefetch_next_block(addr, mf, time, events);
+                }
             }
             break;
         case TAGGED_PREFETCH:
@@ -1864,8 +1864,8 @@ l1_cache::access( new_addr_type addr,
                         block->set_tag_bit(true);
 
                         //prefetch
-                        prefetch_next_block(addr, mf, time, events);
-
+                        enum cache_request_status prefetch_status = prefetch_next_block(addr, mf, time, events);
+                        RESERVATION_FAIL
                         //set tag to false(0)
                         new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf, 1));
                         unsigned cache_index = (unsigned)-1;
