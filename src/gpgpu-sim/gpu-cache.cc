@@ -1832,7 +1832,7 @@ l1_cache::access( new_addr_type addr,
                 set_lastaddr(addr);
                 new_addr_type stride=last_addr_val-addr>0 ? last_addr_val-addr : addr-last_addr_val;
                 if(last_addr_val==0) stride=0;
-                prefetch_addr=addr+stride;
+                new_addr_type prefetch_addr=addr+stride;
                 prefetch_next_block(prefetch_addr, mf, time, events);
             }
             break;
