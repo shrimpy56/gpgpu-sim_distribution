@@ -1549,23 +1549,20 @@ protected:
                       unsigned time,
                       std::list<cache_event> &events,
                       enum cache_request_status status );
-protected:
-    new_addr_type last_addr=0;
-    new_addr_type stride=0;
 
-    void set_lastaddr(new_addr_type val) {
-        last_addr = val;
-    }
-    new_addr_type get_lastaddr() {
-        return(last_addr);
-    }
+public:
+    struct StrideTableVal{
+        char state;
+        new_addr_type lastaddr;
+        new_addr_type stride;
+        StrideTableVal(char _state, new_addr_type _lastaddr, new_addr_type _stride) {
+            state=_state;
+            lastaddr=_lastaddr;
+            stride=_stride;
+        }
+    };
 
-    void set_stride(new_addr_type val) {
-        stride = val;
-    }
-    new_addr_type get_stride() {
-        return(stride);
-    }
+    std::map<address_type, StrideTableVal> StrideTable;
 };
 
 /// This is meant to model the first level data cache in Fermi.
