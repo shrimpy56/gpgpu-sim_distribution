@@ -1784,7 +1784,7 @@ l1_cache::access( new_addr_type addr,
                 enum cache_request_status probe_status
                         = m_tag_array->probe( block_addr, cache_index, mf, true);
                 line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
-                if (!block) break;
+                //if (!block) break;
 
                 if (access_status == HIT)
                 {
