@@ -1784,7 +1784,7 @@ l1_cache::access( new_addr_type addr,
                 enum cache_request_status probe_status
                         = m_tag_array->probe( block_addr, cache_index, mf, true);
                 line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
-                //if (!block) break;
+                assert(block != NULL);
 
                 if (access_status == HIT)
                 {
@@ -1828,27 +1828,27 @@ l1_cache::access( new_addr_type addr,
             //Strided prefetch
             {
                 //access_status
-                address_type INSTPC = mf->get_inst()->pc;
-                new_addr_type INSTADDR = addr;
-
-                if(StrideTable.find(INSTPC)==StrideTable.end())       //not found in table
-                {
-                    struct StrideTableVal newItem = StrideTableVal('I', INSTADDR, 0);
-                    StrideTable.insert(pair<address_type, StrideTableVal>(INSTPC, newItem));
-                }
-                else    //found in table
-                {
-                    new_addr_type INSTSTRIDE = abs(StrideTable[INSTPC].lastaddr - INSTADDR);
-                    StrideTable[INSTPC].lastaddr=INSTADDR;
-                    if(INSTSTRIDE==StrideTable[INSTPC].stride){
-                        StrideTable[INSTPC].state='S';
-                        prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
-                    }
-                    else{
-                        StrideTable[INSTPC].stride=INSTSTRIDE;
-                        StrideTable[INSTPC].state='T';
-                    }
-                }
+//                address_type INSTPC = mf->get_inst()->pc;
+//                new_addr_type INSTADDR = addr;
+//
+//                if(StrideTable.find(INSTPC)==StrideTable.end())       //not found in table
+//                {
+//                    struct StrideTableVal newItem = StrideTableVal('I', INSTADDR, 0);
+//                    StrideTable.insert(pair<address_type, StrideTableVal>(INSTPC, newItem));
+//                }
+//                else    //found in table
+//                {
+//                    new_addr_type INSTSTRIDE = abs(StrideTable[INSTPC].lastaddr - INSTADDR);
+//                    StrideTable[INSTPC].lastaddr=INSTADDR;
+//                    if(INSTSTRIDE==StrideTable[INSTPC].stride){
+//                        StrideTable[INSTPC].state='S';
+//                        prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
+//                    }
+//                    else{
+//                        StrideTable[INSTPC].stride=INSTSTRIDE;
+//                        StrideTable[INSTPC].state='T';
+//                    }
+//                }
                 /*
                 new_addr_type last_addr_val=get_lastaddr();
                 set_lastaddr(addr);
