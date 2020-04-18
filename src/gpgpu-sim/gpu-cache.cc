@@ -1908,7 +1908,6 @@ l1_cache::access( new_addr_type addr,
             //Strided prefetch
             {
                 //access_status
-<<<<<<< HEAD
                 address_type INSTPC = mf->get_inst()->pc;
                 address_type HASHPC = INSTPC & 0X0FFFF;     //lower 16 bits
                 new_addr_type INSTADDR = addr;
@@ -1956,37 +1955,6 @@ l1_cache::access( new_addr_type addr,
                     struct StrideTableVal newItem = StrideTableVal('I', INSTADDR, 0);
                     StrideTable.insert(pair<address_type, StrideTableVal>(HASHPC, newItem));
                 }
-=======
-//                address_type INSTPC = mf->get_inst()->pc;
-//                new_addr_type INSTADDR = addr;
-//
-//                if(StrideTable.find(INSTPC)==StrideTable.end())       //not found in table
-//                {
-//                    struct StrideTableVal newItem = StrideTableVal('I', INSTADDR, 0);
-//                    StrideTable.insert(pair<address_type, StrideTableVal>(INSTPC, newItem));
-//                }
-//                else    //found in table
-//                {
-//                    new_addr_type INSTSTRIDE = abs(StrideTable[INSTPC].lastaddr - INSTADDR);
-//                    StrideTable[INSTPC].lastaddr=INSTADDR;
-//                    if(INSTSTRIDE==StrideTable[INSTPC].stride){
-//                        StrideTable[INSTPC].state='S';
-//                        prefetch_next_sub_block(INSTADDR+INSTSTRIDE, mf, time, events);
-//                    }
-//                    else{
-//                        StrideTable[INSTPC].stride=INSTSTRIDE;
-//                        StrideTable[INSTPC].state='T';
-//                    }
-//                }
-                /*
-                new_addr_type last_addr_val=get_lastaddr();
-                set_lastaddr(addr);
-                new_addr_type stride=last_addr_val-addr>0 ? last_addr_val-addr : addr-last_addr_val;
-                if(last_addr_val==0) stride=0;
-                new_addr_type prefetch_addr=addr+stride;
-                prefetch_next_sub_block(prefetch_addr, mf, time, events);
-                 */
->>>>>>> 4eaff4ff0c68e9cea9e8f9c0c966d43607249905
             }
             break;
         default:
