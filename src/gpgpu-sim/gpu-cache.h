@@ -1566,6 +1566,7 @@ protected:
 
 public:
     struct StrideTableVal{
+        address_type pctag;
         char state;
         new_addr_type lastaddr;
         new_addr_type stride;
@@ -1577,6 +1578,10 @@ public:
     };
 
     std::map<address_type, StrideTableVal> StrideTable;
+
+    void compact_StrideTable(){
+
+    }
 };
 
 /// This is meant to model the first level data cache in Fermi.

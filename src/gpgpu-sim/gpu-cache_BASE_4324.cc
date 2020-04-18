@@ -845,14 +845,6 @@ void cache_stats::get_sub_stats(struct cache_sub_stats &css) const{
             if(status == MISS || status == SECTOR_MISS)
                 t_css.misses += m_stats[type][status];
 
-            if(type == GLOBAL_ACC_W){
-                if (status == HIT){
-                    t_css.write_hits += m_stats[type][status];
-                } else if (status == MISS || status == SECTOR_MISS){
-                     t_css.write_misses += m_stats[type][status];
-                }
-            }
-
             if(status == HIT_RESERVED)
                 t_css.pending_hits += m_stats[type][status];
 
@@ -1670,86 +1662,19 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
     return access_status;
 }
 
-new_addr_type data_cache::get_next_nth_sub_block_addr(mem_fetch *mf, int sector_num)
+new_addr_type data_cache::get_next_nth_block_addr(mem_fetch *mf, int block_num)
 {
-//    unsigned get_sector_index(mem_access_sector_mask_t sector_mask)
-//    {
-//        assert(sector_mask.count() == 1);
-//        for(unsigned i =0; i< SECTOR_CHUNCK_SIZE; ++i) {
-//            if(sector_mask.to_ulong() & (1<<i))
-//                return i;
-//        }
-//    }
+    unsigned cache_index = (unsigned)-1;
+    m_tag_array->probe( mf->get_addr(), cache_index, mf, true);
 
-
-//    if(mf->get_data_size() == SECTOR_SIZE && mf->get_access_sector_mask().count() == 1) {
-//        return mf->get_addr() + SECTOR_SIZE * sector_num; //TODO: mask
-//    } else if (mf->get_data_size() == 128 || mf->get_data_size() == 64) {
-//        //We only accept 32, 64 and 128 bytes reqs
-//        unsigned start=0, end=0;
-//        if(mf->get_data_size() == 128) {
-//            start=0; end=3;
-//        } else if (mf->get_data_size() == 64 && mf->get_access_sector_mask().to_string() == "1100") {
-//            start=2; end=3;
-//        } else if (mf->get_data_size() == 64 && mf->get_access_sector_mask().to_string() == "0011") {
-//            start=0; end=1;
-//        } else if (mf->get_data_size() == 64 && (mf->get_access_sector_mask().to_string() == "1111" || mf->get_access_sector_mask().to_string() == "0000")) {
-//            if(mf->get_addr() % 128 == 0) {
-//                start=0; end=1;
-//            } else {
-//                start=2; end=3;
-//            }
-//        } else
-//        {
-//            printf("Invalid sector received, address = 0x%06x, sector mask = %s, data size = %d",
-//                   mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size());
-//            assert(0 && "Undefined sector mask is received");
-//        }
-//
-//        std::bitset<SECTOR_SIZE*SECTOR_CHUNCK_SIZE> byte_sector_mask;
-//        byte_sector_mask.reset();
-//        for(unsigned  k=start*SECTOR_SIZE; k< SECTOR_SIZE; ++k)
-//            byte_sector_mask.set(k);
-//
-//        for(unsigned j=start, i=0; j<= end ; ++j, ++i){
-//
-//            const mem_access_t *ma = new  mem_access_t( mf->get_access_type(),
-//                                                        mf->get_addr() + SECTOR_SIZE*i,
-//                                                        SECTOR_SIZE,
-//                                                        mf->is_write(),
-//                                                        mf->get_access_warp_mask(),
-//                                                        mf->get_access_byte_mask() & byte_sector_mask,
-//                                                        std::bitset<SECTOR_CHUNCK_SIZE>().set(j));
-//
-//            mem_fetch *n_mf = new mem_fetch( *ma,
-//                                             NULL,
-//                                             mf->get_ctrl_size(),
-//                                             mf->get_wid(),
-//                                             mf->get_sid(),
-//                                             mf->get_tpc(),
-//                                             mf->get_mem_config(),
-//                                             mf);
-//
-//            result.push_back(n_mf);
-//            byte_sector_mask <<= SECTOR_SIZE;
-//        }
-//    }
-//
-//
-//    //calculate block
-//    mf->get_addr() + mf->get_access_size()
-//
-//    //calculate sector
-//
-//
-//    mf->get_access_sector_mask()
-    return mf->get_addr() + SECTOR_SIZE * sector_num;
+    return mf->get_addr() + m_tag_array->get_cache_block()[cache_index]->get_modified_size() * block_num;
 }
 
 enum cache_request_status
-data_cache::prefetch_next_sub_block(mem_fetch *mf,
-                                    unsigned time,
-                                    std::list<cache_event> &events )
+data_cache::prefetch_next_block( new_addr_type addr,
+                                               mem_fetch *mf,
+                                               unsigned time,
+                                               std::list<cache_event> &events )
 {
     bool wr = mf->get_is_write();
 
@@ -1761,7 +1686,7 @@ data_cache::prefetch_next_sub_block(mem_fetch *mf,
     }
 
     const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
-                                              get_next_nth_sub_block_addr(mf, 1),
+                                              get_next_nth_block_addr(mf, 1),
                                               mf->get_data_size(),
                                               mf->is_write(),
                                               mf->get_access_warp_mask(),
@@ -1815,7 +1740,6 @@ data_cache::access( new_addr_type addr,
         = m_tag_array->probe( block_addr, cache_index, mf, true);
     enum cache_request_status access_status
         = process_tag_probe( wr, probe_status, addr, cache_index, mf, time, events );
-
     m_stats.inc_stats(mf->get_access_type(),
         m_stats.select_stats_status(probe_status, access_status));
     m_stats.inc_stats_pw(mf->get_access_type(),
@@ -1835,15 +1759,12 @@ l1_cache::access( new_addr_type addr,
 {
     enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
 
-    printf("l1_cache::access, address = %llx, sector mask = %s, data size = %d, byte mask = %s",
-           mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size(), mf->get_access_byte_mask());
-
     switch (DATA_PREFETCH_MODE)
     {
         case ALWAYS_PREFETCH:
             //Always prefetch
             {
-                prefetch_next_sub_block(mf, time, events);
+                prefetch_next_block(addr, mf, time, events);
             }
             break;
         case PREFETCH_ON_MISS:
@@ -1851,111 +1772,62 @@ l1_cache::access( new_addr_type addr,
             {
                 if (access_status == MISS) {
                     //prefetch next block
-                    prefetch_next_sub_block(mf, time, events);
+                    prefetch_next_block(addr, mf, time, events);
                 }
             }
             break;
         case TAGGED_PREFETCH:
             //Tagged prefetch
             {
-//                new_addr_type block_addr = m_config.block_addr(addr);
-//                unsigned cache_index = (unsigned)-1;
-//                enum cache_request_status probe_status
-//                        = m_tag_array->probe( block_addr, cache_index, mf, true);
-//                sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
-//                assert(block != NULL);
-//
-//                if (access_status == HIT)
-//                {
-//                    // prefetched data
-//                    if (block->get_tag_bit() == false)
-//                    {
-//                        block->set_tag_bit(true);
-//
-//                        //prefetch
-//                        enum cache_request_status prefetch_status = prefetch_next_sub_block(mf, time, events);
-//                        if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
-//                        {
-//                            //set tag to false(0)
-//                            new_addr_type block_addr = m_config.block_addr(get_next_nth_sub_block_addr(mf, 1));
-//                            unsigned cache_index = (unsigned)-1;
-//                            enum cache_request_status probe_status
-//                                    = m_tag_array->probe( block_addr, cache_index, mf, true);
-//                            sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
-//                            block->set_tag_bit(false);
-//                        }
-//                    }
-//                }
-//                else if (access_status == MISS)
-//                {
-//                    enum cache_request_status prefetch_status = prefetch_next_sub_block(mf, time, events);
-//
-//                    if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
-//                    {
-//                        //set tag to false(0)
-//                        new_addr_type block_addr = m_config.block_addr(get_next_nth_sub_block_addr(mf, 1));
-//                        unsigned cache_index = (unsigned)-1;
-//                        enum cache_request_status probe_status
-//                                = m_tag_array->probe( block_addr, cache_index, mf, true);
-//                        sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
-//                        block->set_tag_bit(false);
-//                    }
-//                }
+                new_addr_type block_addr = m_config.block_addr(addr);
+                unsigned cache_index = (unsigned)-1;
+                enum cache_request_status probe_status
+                        = m_tag_array->probe( block_addr, cache_index, mf, true);
+                line_cache_block* block = dynamic_cast<line_cache_block*>(m_tag_array->get_block(cache_index));
+                assert(block != NULL);
+
+                if (access_status == HIT)
+                {
+                    // prefetched data
+                    if (block->get_tag_bit() == false)
+                    {
+                        block->set_tag_bit(true);
+
+                        //prefetch
+                        enum cache_request_status prefetch_status = prefetch_next_block(addr, mf, time, events);
+                        if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                        {
+                            //set tag to false(0)
+                            new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf, 1));
+                            unsigned cache_index = (unsigned)-1;
+                            enum cache_request_status probe_status
+                                    = m_tag_array->probe( block_addr, cache_index, mf, true);
+                            line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
+                            block->set_tag_bit(false);
+                        }
+                    }
+                }
+                else if (access_status == MISS)
+                {
+                    enum cache_request_status prefetch_status = prefetch_next_block(addr, mf, time, events);
+
+                    if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                    {
+                        //set tag to false(0)
+                        new_addr_type block_addr = m_config.block_addr(get_next_nth_block_addr(mf, 1));
+                        unsigned cache_index = (unsigned)-1;
+                        enum cache_request_status probe_status
+                                = m_tag_array->probe( block_addr, cache_index, mf, true);
+                        line_cache_block* block = (line_cache_block*) m_tag_array->get_block(cache_index);
+                        block->set_tag_bit(false);
+                    }
+                }
             }
             break;
         case STRIDED_PREFETCH:
             //Strided prefetch
             {
                 //access_status
-<<<<<<< HEAD
-                address_type INSTPC = mf->get_inst()->pc;
-                address_type HASHPC = INSTPC & 0X0FFFF;     //lower 16 bits
-                new_addr_type INSTADDR = addr;
-
-                if(StrideTable.find(HASHPC)!=StrideTable.end() && StrideTable[HASHPC].pctag==INSTPC)    //found in table
-                {
-                    new_addr_type INSTSTRIDE = abs(StrideTable[HASHPC].lastaddr - INSTADDR);
-                    StrideTable[HASHPC].lastaddr=INSTADDR;
-                    if(INSTSTRIDE==StrideTable[HASHPC].stride){     //correct
-                        if(StrideTable[HASHPC].state=='I') {
-                            StrideTable[HASHPC].state = 'S';
-                        }
-                        else if(StrideTable[HASHPC].state=='S') {
-                            StrideTable[HASHPC].state = 'S';
-                        }
-                        else if(StrideTable[HASHPC].state=='N') {
-                            StrideTable[HASHPC].state = 'T';
-                        }
-                        else if(StrideTable[HASHPC].state=='T') {
-                            StrideTable[HASHPC].state = 'S';
-                        }
-                    }
-                    else{       //incorrect
-                        if(StrideTable[HASHPC].state=='I') {
-                            StrideTable[HASHPC].stride=INSTSTRIDE;
-                            StrideTable[HASHPC].state = 'T';
-                        }
-                        else if(StrideTable[HASHPC].state=='S') {
-                            StrideTable[HASHPC].state = 'I';
-                        }
-                        else if(StrideTable[HASHPC].state=='N') {
-                            StrideTable[HASHPC].stride=INSTSTRIDE;
-                            StrideTable[HASHPC].state = 'N';
-                        }
-                        else if(StrideTable[HASHPC].state=='T') {
-                            StrideTable[HASHPC].stride=INSTSTRIDE;
-                            StrideTable[HASHPC].state = 'N';
-                        }
-                    }
-                    if(StrideTable[HASHPC].state=='T' || StrideTable[HASHPC].state=='S')
-                        //TODO: prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
-                }
-                else       //not found in table
-                {
-                    struct StrideTableVal newItem = StrideTableVal('I', INSTADDR, 0);
-                    StrideTable.insert(pair<address_type, StrideTableVal>(HASHPC, newItem));
-                }
-=======
 //                address_type INSTPC = mf->get_inst()->pc;
 //                new_addr_type INSTADDR = addr;
 //
@@ -1970,7 +1842,7 @@ l1_cache::access( new_addr_type addr,
 //                    StrideTable[INSTPC].lastaddr=INSTADDR;
 //                    if(INSTSTRIDE==StrideTable[INSTPC].stride){
 //                        StrideTable[INSTPC].state='S';
-//                        prefetch_next_sub_block(INSTADDR+INSTSTRIDE, mf, time, events);
+//                        prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
 //                    }
 //                    else{
 //                        StrideTable[INSTPC].stride=INSTSTRIDE;
@@ -1983,9 +1855,8 @@ l1_cache::access( new_addr_type addr,
                 new_addr_type stride=last_addr_val-addr>0 ? last_addr_val-addr : addr-last_addr_val;
                 if(last_addr_val==0) stride=0;
                 new_addr_type prefetch_addr=addr+stride;
-                prefetch_next_sub_block(prefetch_addr, mf, time, events);
+                prefetch_next_block(prefetch_addr, mf, time, events);
                  */
->>>>>>> 4eaff4ff0c68e9cea9e8f9c0c966d43607249905
             }
             break;
         default:
