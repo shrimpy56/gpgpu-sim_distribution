@@ -47,7 +47,7 @@ enum cache_prefetch_mode {
     TAGGED_PREFETCH,
     STRIDED_PREFETCH,
 };
-static enum cache_prefetch_mode DATA_PREFETCH_MODE = TAGGED_PREFETCH;
+static enum cache_prefetch_mode DATA_PREFETCH_MODE = NO_PREFETCH;
 
 enum cache_block_state {
     INVALID=0,
@@ -155,7 +155,6 @@ struct line_cache_block: public cache_block_t  {
 	        m_ignore_on_fill_status = false;
 	        m_set_modified_on_fill = false;
 	        m_readable = true;
-            m_tag_bit = true;
 	    }
 	    void allocate( new_addr_type tag, new_addr_type block_addr, unsigned time, mem_access_sector_mask_t sector_mask)
 	    {
@@ -167,7 +166,6 @@ struct line_cache_block: public cache_block_t  {
 	        m_status=RESERVED;
 	        m_ignore_on_fill_status = false;
 	        m_set_modified_on_fill = false;
-            m_tag_bit = true;
 	    }
 		void fill( unsigned time, mem_access_sector_mask_t sector_mask )
 	    {
@@ -238,14 +236,6 @@ struct line_cache_block: public cache_block_t  {
 			 printf("m_block_addr is %llu, status = %u\n", m_block_addr, m_status);
 		}
 
-        // Tagged prefetching getters & setters
-        bool set_tag_bit(bool bit) {
-	        m_tag_bit = bit;
-        }
-        bool get_tag_bit() {
-            return m_tag_bit;
-        }
-
 private:
 	    unsigned long long     m_alloc_time;
 	    unsigned long long     m_last_access_time;
@@ -254,10 +244,6 @@ private:
 	    bool m_ignore_on_fill_status;
 	    bool m_set_modified_on_fill;
 	    bool m_readable;
-
-	    // Tagged prefetching related variables
-	    bool m_tag_bit;
-
 };
 
 struct sector_cache_block : public cache_block_t {
@@ -275,6 +261,7 @@ struct sector_cache_block : public cache_block_t {
 			m_ignore_on_fill_status[i] = false;
 			m_set_modified_on_fill[i] = false;
 			m_readable[i] = true;
+            m_tag_bit[i] = true;
 			}
 			m_line_alloc_time=0;
 			m_line_last_access_time=0;
@@ -303,6 +290,7 @@ struct sector_cache_block : public cache_block_t {
 		m_status[sidx]=RESERVED;
 		m_ignore_on_fill_status[sidx] = false;
 		m_set_modified_on_fill[sidx] = false;
+        m_tag_bit[sidx] = true;
 
 		//set line stats
 		m_line_alloc_time=time;   //only set this for the first allocated sector
@@ -329,6 +317,7 @@ struct sector_cache_block : public cache_block_t {
 		m_ignore_on_fill_status[sidx] = false;
 		//m_set_modified_on_fill[sidx] = false;
 		m_readable[sidx] = true;
+        m_tag_bit[sidx] = true;
 
 		//set line stats
 		m_line_last_access_time=time;
@@ -441,6 +430,13 @@ struct sector_cache_block : public cache_block_t {
     	 printf("m_block_addr is %llu, status = %u %u %u %u\n", m_block_addr, m_status[0], m_status[1], m_status[2], m_status[3]);
     }
 
+    // Tagged prefetching getters & setters
+    bool set_tag_bit(bool bit, unsigned sidx ) {
+        m_tag_bit[sidx] = bit;
+    }
+    bool get_tag_bit(unsigned sidx) {
+        return m_tag_bit[sidx];
+    }
 
 private:
     unsigned m_sector_alloc_time[SECTOR_CHUNCK_SIZE];
@@ -453,6 +449,9 @@ private:
     bool m_ignore_on_fill_status[SECTOR_CHUNCK_SIZE];
     bool m_set_modified_on_fill[SECTOR_CHUNCK_SIZE];
     bool m_readable[SECTOR_CHUNCK_SIZE];
+
+    // Tagged prefetching related variables
+    bool m_tag_bit[SECTOR_CHUNCK_SIZE];
 
     unsigned get_sector_index(mem_access_sector_mask_t sector_mask)
     {
@@ -1410,12 +1409,11 @@ protected:
                            unsigned time,
                            std::list<cache_event>& events );
 
-    enum cache_request_status prefetch_next_block( new_addr_type addr,
-                                                   mem_fetch *mf,
-                                                   unsigned time,
-                                                   std::list<cache_event> &events );
+    enum cache_request_status prefetch_next_sub_block(mem_fetch *mf,
+                                                      unsigned time,
+                                                      std::list<cache_event> &events);
 protected:
-    new_addr_type get_next_nth_block_addr(mem_fetch *mf, int block_num = 1);
+    new_addr_type get_next_nth_sub_block_addr(mem_fetch *mf, int sector_num = 1);
 
 protected:
     mem_fetch_allocator *m_memfetch_creator;
