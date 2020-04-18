@@ -2566,8 +2566,12 @@ void gpgpu_sim::shader_print_cache_stats( FILE *fout ) const{
         }
         fprintf(fout, "\tL1D_total_cache_accesses = %llu\n", total_css.accesses);
         fprintf(fout, "\tL1D_total_cache_misses = %llu\n", total_css.misses);
+        fprintf(fout, "\tL1D_total_write_cache_hits = %llu\n", total_css.write_hits);
+        fprintf(fout, "\tL1D_total_write_cache_misses = %llu\n", total_css.write_misses);
         if(total_css.accesses > 0){
             fprintf(fout, "\tL1D_total_cache_miss_rate = %.4lf\n", (double)total_css.misses / (double)total_css.accesses);
+            fprintf(fout, "\tL1D_total_cache_read_miss_rate = %.4lf\n", 
+                    ((double)total_css.misses - (double)total_css.write_misses) / ((double)total_css.accesses - (double)total_css.write_misses - (double)total_css.write_hits));
         }
         fprintf(fout, "\tL1D_total_cache_pending_hits = %llu\n", total_css.pending_hits);
         fprintf(fout, "\tL1D_total_cache_reservation_fails = %llu\n", total_css.res_fails);
