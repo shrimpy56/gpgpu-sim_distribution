@@ -1834,8 +1834,11 @@ l1_cache::access( new_addr_type addr,
                   std::list<cache_event> &events )
 {
     enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
-    printf("l1_cache::access, address = 0x%06x, sector mask = %s, data size = %d, byte mask = %s,",
-           mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size(), mf->get_access_byte_mask());
+
+    printf("l1_cache::access, address = 0x%06x, sector mask = %s, data size = %d",
+           mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size());
+//    printf("l1_cache::access, address = 0x%06x, sector mask = %s, data size = %d, byte mask = %s,",
+//           mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size(), mf->get_access_byte_mask());
 
 
     switch (DATA_PREFETCH_MODE)
