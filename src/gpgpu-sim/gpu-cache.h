@@ -942,7 +942,7 @@ struct cache_sub_stats{
     unsigned long long accesses;
     unsigned long long misses;
 
-    unsigned long long write_accesses;
+    unsigned long long write_hits;
     unsigned long long write_misses;
 
     unsigned long long pending_hits;
@@ -958,6 +958,10 @@ struct cache_sub_stats{
     void clear(){
         accesses = 0;
         misses = 0;
+
+        write_hits = 0;
+        write_misses = 0;
+
         pending_hits = 0;
         res_fails = 0;
         port_available_cycles = 0; 
@@ -971,7 +975,7 @@ struct cache_sub_stats{
         accesses += css.accesses;
         misses += css.misses;
 
-        write_accesses += css.write_accesses;
+        write_hits += css.write_hits;
         write_misses += css.write_misses;
 
         pending_hits += css.pending_hits;
@@ -990,8 +994,8 @@ struct cache_sub_stats{
         ret.accesses = accesses + cs.accesses;
         ret.misses = misses + cs.misses;
 
-        ret.write_accesses += css.write_accesses;
-        ret.write_misses += css.write_misses;
+        ret.write_hits += cs.write_hits;
+        ret.write_misses += cs.write_misses;
 
         ret.pending_hits = pending_hits + cs.pending_hits;
         ret.res_fails = res_fails + cs.res_fails;
