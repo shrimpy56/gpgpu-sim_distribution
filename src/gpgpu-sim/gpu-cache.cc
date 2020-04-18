@@ -1670,86 +1670,30 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
     return access_status;
 }
 
-new_addr_type data_cache::get_next_nth_sub_block_addr(mem_fetch *mf, int sector_num)
-{
-//    unsigned get_sector_index(mem_access_sector_mask_t sector_mask)
-//    {
-//        assert(sector_mask.count() == 1);
-//        for(unsigned i =0; i< SECTOR_CHUNCK_SIZE; ++i) {
-//            if(sector_mask.to_ulong() & (1<<i))
-//                return i;
-//        }
-//    }
+//Notice: We only need to support SECTOR_SIZE(32) bytes requests now by analyzing our NN workload
+// , so we suppose data size is SECTOR_SIZE and sector_mask only has one '1' in it.
+new_addr_type data_cache::get_next_nth_sector_addr(mem_fetch *mf, mem_access_sector_mask_t& new_sector_mask
+        , mem_access_byte_mask_t& new_byte_mask, int sector_num) {
 
+    int mod = mf->get_addr() % (SECTOR_SIZE * SECTOR_CHUNCK_SIZE);
 
-//    if(mf->get_data_size() == SECTOR_SIZE && mf->get_access_sector_mask().count() == 1) {
-//        return mf->get_addr() + SECTOR_SIZE * sector_num; //TODO: mask
-//    } else if (mf->get_data_size() == 128 || mf->get_data_size() == 64) {
-//        //We only accept 32, 64 and 128 bytes reqs
-//        unsigned start=0, end=0;
-//        if(mf->get_data_size() == 128) {
-//            start=0; end=3;
-//        } else if (mf->get_data_size() == 64 && mf->get_access_sector_mask().to_string() == "1100") {
-//            start=2; end=3;
-//        } else if (mf->get_data_size() == 64 && mf->get_access_sector_mask().to_string() == "0011") {
-//            start=0; end=1;
-//        } else if (mf->get_data_size() == 64 && (mf->get_access_sector_mask().to_string() == "1111" || mf->get_access_sector_mask().to_string() == "0000")) {
-//            if(mf->get_addr() % 128 == 0) {
-//                start=0; end=1;
-//            } else {
-//                start=2; end=3;
-//            }
-//        } else
-//        {
-//            printf("Invalid sector received, address = 0x%06x, sector mask = %s, data size = %d",
-//                   mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size());
-//            assert(0 && "Undefined sector mask is received");
-//        }
-//
-//        std::bitset<SECTOR_SIZE*SECTOR_CHUNCK_SIZE> byte_sector_mask;
-//        byte_sector_mask.reset();
-//        for(unsigned  k=start*SECTOR_SIZE; k< SECTOR_SIZE; ++k)
-//            byte_sector_mask.set(k);
-//
-//        for(unsigned j=start, i=0; j<= end ; ++j, ++i){
-//
-//            const mem_access_t *ma = new  mem_access_t( mf->get_access_type(),
-//                                                        mf->get_addr() + SECTOR_SIZE*i,
-//                                                        SECTOR_SIZE,
-//                                                        mf->is_write(),
-//                                                        mf->get_access_warp_mask(),
-//                                                        mf->get_access_byte_mask() & byte_sector_mask,
-//                                                        std::bitset<SECTOR_CHUNCK_SIZE>().set(j));
-//
-//            mem_fetch *n_mf = new mem_fetch( *ma,
-//                                             NULL,
-//                                             mf->get_ctrl_size(),
-//                                             mf->get_wid(),
-//                                             mf->get_sid(),
-//                                             mf->get_tpc(),
-//                                             mf->get_mem_config(),
-//                                             mf);
-//
-//            result.push_back(n_mf);
-//            byte_sector_mask <<= SECTOR_SIZE;
-//        }
-//    }
-//
-//
-//    //calculate block
-//    mf->get_addr() + mf->get_access_size()
-//
-//    //calculate sector
-//
-//
-//    mf->get_access_sector_mask()
+    mod /= SECTOR_SIZE;
+    new_sector_mask.reset();
+    new_sector_mask.set((mod + 1) % SECTOR_CHUNCK_SIZE);
+
+    new_byte_mask.reset();
+    for (unsigned k = ((mod + 1) % SECTOR_CHUNCK_SIZE) * SECTOR_SIZE; k < SECTOR_SIZE; ++k)
+        new_byte_mask.set(k);
+
     return mf->get_addr() + SECTOR_SIZE * sector_num;
 }
 
 enum cache_request_status
-data_cache::prefetch_next_sub_block(mem_fetch *mf,
-                                    unsigned time,
-                                    std::list<cache_event> &events )
+data_cache::prefetch_next_nth_sector(mem_fetch *mf,
+                                     mem_fetch **new_mf,
+                                     unsigned time,
+                                     std::list<cache_event> &events,
+                                     int sector_num)
 {
     bool wr = mf->get_is_write();
 
@@ -1760,13 +1704,17 @@ data_cache::prefetch_next_sub_block(mem_fetch *mf,
         return RESERVATION_FAIL;
     }
 
+    mem_access_byte_mask_t new_byte_mask;
+    mem_access_sector_mask_t new_sector_mask;
+    new_addr_type new_addr = get_next_nth_sector_addr(mf, new_sector_mask, new_byte_mask, sector_num);
+
     const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
-                                              get_next_nth_sub_block_addr(mf, 1),
-                                              mf->get_data_size(),
+                                              new_addr,
+                                              SECTOR_SIZE,
                                               mf->is_write(),
                                               mf->get_access_warp_mask(),
-                                              mf->get_access_byte_mask(),
-                                              mf->get_access_sector_mask());
+                                              new_byte_mask,
+                                              new_sector_mask);
 
     mem_fetch *n_mf = new mem_fetch(*ma,
                                     NULL,
@@ -1774,7 +1722,13 @@ data_cache::prefetch_next_sub_block(mem_fetch *mf,
                                     mf->get_wid(),
                                     mf->get_sid(),
                                     mf->get_tpc(),
-                                    mf->get_mem_config());
+                                    mf->get_mem_config(),
+                                    mf);
+
+    if (new_mf != NULL)
+    {
+        *new_mf = n_mf;
+    }
 
     assert(n_mf->get_data_size() <= m_config.get_atom_sz());
     new_addr_type block_addr = m_config.block_addr(n_mf->get_addr());
@@ -1842,6 +1796,7 @@ l1_cache::access( new_addr_type addr,
     // std::cout << ", data size = = " <<  mf->get_data_size();
     // std::cout << ", byte mask = " <<  mf->get_access_byte_mask() << std::endl;
 
+
     enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
 
     switch (DATA_PREFETCH_MODE)
@@ -1849,7 +1804,7 @@ l1_cache::access( new_addr_type addr,
         case ALWAYS_PREFETCH:
             //Always prefetch
             {
-                prefetch_next_sub_block(mf, time, events);
+                prefetch_next_nth_sector(mf, NULL, time, events);
             }
             break;
         case PREFETCH_ON_MISS:
@@ -1857,56 +1812,58 @@ l1_cache::access( new_addr_type addr,
             {
                 if (access_status == MISS) {
                     //prefetch next block
-                    prefetch_next_sub_block(mf, time, events);
+                    prefetch_next_nth_sector(mf, NULL, time, events);
                 }
             }
             break;
         case TAGGED_PREFETCH:
             //Tagged prefetch
             {
-//                new_addr_type block_addr = m_config.block_addr(addr);
-//                unsigned cache_index = (unsigned)-1;
-//                enum cache_request_status probe_status
-//                        = m_tag_array->probe( block_addr, cache_index, mf, true);
-//                sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
-//                assert(block != NULL);
-//
-//                if (access_status == HIT)
-//                {
-//                    // prefetched data
-//                    if (block->get_tag_bit() == false)
-//                    {
-//                        block->set_tag_bit(true);
-//
-//                        //prefetch
-//                        enum cache_request_status prefetch_status = prefetch_next_sub_block(mf, time, events);
-//                        if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
-//                        {
-//                            //set tag to false(0)
-//                            new_addr_type block_addr = m_config.block_addr(get_next_nth_sub_block_addr(mf, 1));
-//                            unsigned cache_index = (unsigned)-1;
-//                            enum cache_request_status probe_status
-//                                    = m_tag_array->probe( block_addr, cache_index, mf, true);
-//                            sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
-//                            block->set_tag_bit(false);
-//                        }
-//                    }
-//                }
-//                else if (access_status == MISS)
-//                {
-//                    enum cache_request_status prefetch_status = prefetch_next_sub_block(mf, time, events);
-//
-//                    if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
-//                    {
-//                        //set tag to false(0)
-//                        new_addr_type block_addr = m_config.block_addr(get_next_nth_sub_block_addr(mf, 1));
-//                        unsigned cache_index = (unsigned)-1;
-//                        enum cache_request_status probe_status
-//                                = m_tag_array->probe( block_addr, cache_index, mf, true);
-//                        sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
-//                        block->set_tag_bit(false);
-//                    }
-//                }
+                new_addr_type block_addr = m_config.block_addr(addr);
+                unsigned cache_index = (unsigned)-1;
+                enum cache_request_status probe_status
+                        = m_tag_array->probe( block_addr, cache_index, mf, true);
+                sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+                assert(block != NULL);
+
+                if (access_status == HIT)
+                {
+                    // prefetched data
+                    if (block->get_tag_bit(mf->get_access_sector_mask()) == false)
+                    {
+                        block->set_tag_bit(true, mf->get_access_sector_mask());
+
+                        //prefetch
+                        mem_fetch* new_mf = NULL;
+                        enum cache_request_status prefetch_status = prefetch_next_nth_sector(mf, &new_mf, time, events);
+                        if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                        {
+                            //set tag to false(0)
+                            new_addr_type block_addr = m_config.block_addr(new_mf->get_addr());
+                            unsigned cache_index = (unsigned)-1;
+                            enum cache_request_status probe_status
+                                    = m_tag_array->probe( block_addr, cache_index, new_mf, true);
+                            sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+                            block->set_tag_bit(false, new_mf->get_access_sector_mask());
+                        }
+                    }
+                }
+                else if (access_status == MISS)
+                {
+                    mem_fetch* new_mf = NULL;
+                    enum cache_request_status prefetch_status = prefetch_next_nth_sector(mf, &new_mf, time, events);
+
+                    if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                    {
+                        //set tag to false(0)
+                        new_addr_type block_addr = m_config.block_addr(new_mf->get_addr());
+                        unsigned cache_index = (unsigned)-1;
+                        enum cache_request_status probe_status
+                                = m_tag_array->probe( block_addr, cache_index, new_mf, true);
+                        sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+                        block->set_tag_bit(false, new_mf->get_access_sector_mask());
+                    }
+                }
             }
             break;
         case STRIDED_PREFETCH:

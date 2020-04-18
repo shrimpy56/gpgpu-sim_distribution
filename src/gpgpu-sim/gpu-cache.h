@@ -47,7 +47,7 @@ enum cache_prefetch_mode {
     TAGGED_PREFETCH,
     STRIDED_PREFETCH,
 };
-static enum cache_prefetch_mode DATA_PREFETCH_MODE = NO_PREFETCH;
+static enum cache_prefetch_mode DATA_PREFETCH_MODE = PREFETCH_ON_MISS;
 
 enum cache_block_state {
     INVALID=0,
@@ -431,10 +431,14 @@ struct sector_cache_block : public cache_block_t {
     }
 
     // Tagged prefetching getters & setters
-    bool set_tag_bit(bool bit, unsigned sidx ) {
+    bool set_tag_bit(bool bit, mem_access_sector_mask_t sector_mask ) {
+        unsigned sidx = get_sector_index(sector_mask);
+
         m_tag_bit[sidx] = bit;
     }
-    bool get_tag_bit(unsigned sidx) {
+    bool get_tag_bit(mem_access_sector_mask_t sector_mask) {
+        unsigned sidx = get_sector_index(sector_mask);
+
         return m_tag_bit[sidx];
     }
 
@@ -1425,11 +1429,14 @@ protected:
                            unsigned time,
                            std::list<cache_event>& events );
 
-    enum cache_request_status prefetch_next_sub_block(mem_fetch *mf,
-                                                      unsigned time,
-                                                      std::list<cache_event> &events);
+    enum cache_request_status prefetch_next_nth_sector(mem_fetch *mf,
+                                                       mem_fetch **new_mf,
+                                                       unsigned time,
+                                                       std::list<cache_event> &events,
+                                                       int sector_num = 1);
 protected:
-    new_addr_type get_next_nth_sub_block_addr(mem_fetch *mf, int sector_num = 1);
+    new_addr_type get_next_nth_sector_addr(mem_fetch *mf, mem_access_sector_mask_t& new_sector_mask
+            , mem_access_byte_mask_t& new_byte_mask, int sector_num = 1);
 
 protected:
     mem_fetch_allocator *m_memfetch_creator;
