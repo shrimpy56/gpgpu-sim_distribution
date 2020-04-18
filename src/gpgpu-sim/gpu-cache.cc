@@ -1907,7 +1907,6 @@ l1_cache::access( new_addr_type addr,
         case STRIDED_PREFETCH:
             //Strided prefetch
             {
-<<<<<<< HEAD
                 // //access_status
                 // address_type INSTPC = mf->get_inst()->pc;
                 // address_type HASHPC = INSTPC & 0X0FFFF;     //lower 16 bits
