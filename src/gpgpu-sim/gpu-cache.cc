@@ -1833,11 +1833,11 @@ l1_cache::access( new_addr_type addr,
                   unsigned time,
                   std::list<cache_event> &events )
 {
-    enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
+    fprintf(stdout, "l1_cache::access, address = %llx, sector mask = %s, data size = %d, byte mask = %s \n",
+            mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size(), mf->get_access_byte_mask());
+    fflush(stdout);
 
-    fprintf(stderr, "l1_cache::access, address = %llx, sector mask = %s, data size = %d, byte mask = %s",
-           mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size(), mf->get_access_byte_mask());
-    fflush(stderr);
+    enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
 
     switch (DATA_PREFETCH_MODE)
     {
