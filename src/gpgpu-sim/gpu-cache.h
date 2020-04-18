@@ -941,6 +941,10 @@ private:
 struct cache_sub_stats{
     unsigned long long accesses;
     unsigned long long misses;
+
+    unsigned long long write_accesses;
+    unsigned long long write_misses;
+
     unsigned long long pending_hits;
     unsigned long long res_fails;
 
@@ -966,6 +970,10 @@ struct cache_sub_stats{
         ///
         accesses += css.accesses;
         misses += css.misses;
+
+        write_accesses += css.write_accesses;
+        write_misses += css.write_misses;
+
         pending_hits += css.pending_hits;
         res_fails += css.res_fails;
         port_available_cycles += css.port_available_cycles; 
@@ -981,6 +989,10 @@ struct cache_sub_stats{
         cache_sub_stats ret;
         ret.accesses = accesses + cs.accesses;
         ret.misses = misses + cs.misses;
+
+        ret.write_accesses += css.write_accesses;
+        ret.write_misses += css.write_misses;
+
         ret.pending_hits = pending_hits + cs.pending_hits;
         ret.res_fails = res_fails + cs.res_fails;
         ret.port_available_cycles = port_available_cycles + cs.port_available_cycles; 
