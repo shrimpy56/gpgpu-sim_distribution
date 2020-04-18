@@ -845,6 +845,14 @@ void cache_stats::get_sub_stats(struct cache_sub_stats &css) const{
             if(status == MISS || status == SECTOR_MISS)
                 t_css.misses += m_stats[type][status];
 
+            if(type == GLOBAL_ACC_W){
+                if (status == HIT){
+                    t_css.write_hits += m_stats[type][status];
+                } else if (status == MISS || status == SECTOR_MISS){
+                     t_css.write_misses += m_stats[type][status];
+                }
+            }
+
             if(status == HIT_RESERVED)
                 t_css.pending_hits += m_stats[type][status];
 
