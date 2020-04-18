@@ -1570,18 +1570,14 @@ public:
         char state;
         new_addr_type lastaddr;
         new_addr_type stride;
-        StrideTableVal(char _state, new_addr_type _lastaddr, new_addr_type _stride) {
-            state=_state;
-            lastaddr=_lastaddr;
-            stride=_stride;
-        }
+//                    StrideTableVal(address_type _pctag, char _state, new_addr_type _lastaddr, new_addr_type _stride) {
+//                       pctag=_pctag;
+//                       state=_state;
+//                       lastaddr=_lastaddr;
+//                       stride=_stride;
+//                    }
     };
-
     std::map<address_type, StrideTableVal> StrideTable;
-
-    void compact_StrideTable(){
-
-    }
 };
 
 /// This is meant to model the first level data cache in Fermi.
