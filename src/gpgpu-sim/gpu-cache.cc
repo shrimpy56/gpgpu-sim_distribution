@@ -1833,9 +1833,14 @@ l1_cache::access( new_addr_type addr,
                   unsigned time,
                   std::list<cache_event> &events )
 {
-    fprintf(stdout, "l1_cache::access, address = %llx, sector mask = %s, data size = %d, byte mask = %s \n",
-            mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size(), mf->get_access_byte_mask());
-    fflush(stdout);
+    // fprintf(stdout, "l1_cache::access, address = %llx, sector mask = %s, data size = %d, byte mask = %s \n",
+    //         mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size(), mf->get_access_byte_mask());
+    // fflush(stdout);
+
+    // std::cout << "l1_cache::access, address = " <<  mf->get_addr();
+    // std::cout << ", sector mask = " <<   mf->get_access_sector_mask();
+    // std::cout << ", data size = = " <<  mf->get_data_size();
+    // std::cout << ", byte mask = " <<  mf->get_access_byte_mask() << std::endl;
 
     enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
 
