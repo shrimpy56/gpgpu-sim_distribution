@@ -1690,7 +1690,7 @@ new_addr_type data_cache::get_next_nth_sector_addr(mem_fetch *mf, mem_access_sec
 
 enum cache_request_status
 data_cache::prefetch_next_nth_sector(mem_fetch *mf,
-                                     mem_fetch **new_mf,
+                                     mem_fetch **new_mf, // return value
                                      unsigned time,
                                      std::list<cache_event> &events,
                                      int sector_num)
@@ -1740,10 +1740,10 @@ data_cache::prefetch_next_nth_sector(mem_fetch *mf,
             = process_tag_probe_using_prefetch_on_miss(wr, probe_status, n_mf->get_addr(), cache_index, n_mf, time,
                                                        tmp_events);
 
-    m_stats.inc_stats(n_mf->get_access_type(),
-                      m_stats.select_stats_status(probe_status, access_status));
-    m_stats.inc_stats_pw(n_mf->get_access_type(),
-                         m_stats.select_stats_status(probe_status, access_status));
+//    m_stats.inc_stats(n_mf->get_access_type(),
+//                      m_stats.select_stats_status(probe_status, access_status));
+//    m_stats.inc_stats_pw(n_mf->get_access_type(),
+//                         m_stats.select_stats_status(probe_status, access_status));
 
     return access_status;
 }
