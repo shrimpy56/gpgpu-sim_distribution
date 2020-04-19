@@ -47,7 +47,8 @@ enum cache_prefetch_mode {
     TAGGED_PREFETCH,
     STRIDED_PREFETCH,
 };
-static enum cache_prefetch_mode DATA_PREFETCH_MODE = PREFETCH_ON_MISS;
+static enum cache_prefetch_mode L1_DATA_PREFETCH_MODE = PREFETCH_ON_MISS;
+static enum cache_prefetch_mode L2_DATA_PREFETCH_MODE = PREFETCH_ON_MISS;
 
 enum cache_block_state {
     INVALID=0,
@@ -1419,17 +1420,16 @@ protected:
                            unsigned time,
                            std::list<cache_event>& events );
 
-    // perform prefetch on miss
-    enum cache_request_status
-        process_tag_probe_using_prefetch_on_miss( bool wr,
+    virtual enum cache_request_status
+        process_tag_probe_using_prefetch_on_miss(bool wr,
                            enum cache_request_status status,
                            new_addr_type addr,
                            unsigned cache_index,
                            mem_fetch* mf,
                            unsigned time,
-                           std::list<cache_event>& events );
+                           std::list<cache_event>& events);
 
-    enum cache_request_status prefetch_next_nth_sector(mem_fetch *mf,
+    virtual enum cache_request_status prefetch_next_nth_sector(mem_fetch *mf,
                                                        mem_fetch **new_mf,
                                                        unsigned time,
                                                        std::list<cache_event> &events,
@@ -1637,6 +1637,23 @@ public:
                 mem_fetch *mf,
                 unsigned time,
                 std::list<cache_event> &events );
+
+protected:
+    virtual enum cache_request_status
+    process_tag_probe_using_prefetch_on_miss( bool wr,
+                                              enum cache_request_status status,
+                                              new_addr_type addr,
+                                              unsigned cache_index,
+                                              mem_fetch* mf,
+                                              unsigned time,
+                                              std::list<cache_event>& events );
+
+    virtual enum cache_request_status prefetch_next_nth_sector(mem_fetch *mf,
+                                                               mem_fetch **new_mf,
+                                                               unsigned time,
+                                                               std::list<cache_event> &events,
+                                                               int sector_num = 1);
+
 };
 
 /*****************************************************************************/

@@ -1637,15 +1637,15 @@ data_cache::process_tag_probe( bool wr,
     return access_status;
 }
 
-// Prefetch-on-miss process
+// Prefetch-on-miss process for L1D cache
 enum cache_request_status
-data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
+data_cache::process_tag_probe_using_prefetch_on_miss(bool wr,
                                enum cache_request_status probe_status,
                                new_addr_type addr,
                                unsigned cache_index,
                                mem_fetch* mf,
                                unsigned time,
-                               std::list<cache_event>& events ) {
+                               std::list<cache_event>& events) {
     // We test on Volta GPU architecture, which use NO_WRITE_ALLOCATE policy on write miss
     // (Simply send write request to lower level memory), so we do not need to prefetch any data.
     if (wr) {
@@ -1655,7 +1655,7 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
     cache_request_status access_status = probe_status;
 
     if (probe_status == HIT) {
-        //Do nothing
+        // Do nothing
     } else if (probe_status != RESERVATION_FAIL) {
         access_status = (this->*m_rd_miss)(addr,
                                            cache_index,
@@ -1664,6 +1664,45 @@ data_cache::process_tag_probe_using_prefetch_on_miss( bool wr,
     } else {
         //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
         m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+    }
+
+    m_bandwidth_management.use_data_port(mf, access_status, events);
+    return access_status;
+}
+
+// Prefetch-on-miss process for L2 cache
+enum cache_request_status
+l2_cache::process_tag_probe_using_prefetch_on_miss(bool wr,
+                                                      enum cache_request_status probe_status,
+                                                      new_addr_type addr,
+                                                      unsigned cache_index,
+                                                      mem_fetch* mf,
+                                                      unsigned time,
+                                                      std::list<cache_event>& events) {
+
+    cache_request_status access_status = probe_status;
+    if(wr){ // Write
+        if(probe_status == HIT){
+            // Do nothing
+        }else if ( (probe_status != RESERVATION_FAIL) || (probe_status == RESERVATION_FAIL && m_config.m_write_alloc_policy == NO_WRITE_ALLOCATE) ) {
+            access_status = (this->*m_wr_miss)( addr,
+                                                cache_index,
+                                                mf, time, events, probe_status );
+        }else {
+            //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+        }
+    }else{ // Read
+        if(probe_status == HIT){
+            // Do nothing
+        }else if ( probe_status != RESERVATION_FAIL ) {
+            access_status = (this->*m_rd_miss)( addr,
+                                                cache_index,
+                                                mf, time, events, probe_status );
+        }else {
+            //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
+            m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
+        }
     }
 
     m_bandwidth_management.use_data_port(mf, access_status, events);
@@ -1688,6 +1727,7 @@ new_addr_type data_cache::get_next_nth_sector_addr(mem_fetch *mf, mem_access_sec
     return mf->get_addr() + SECTOR_SIZE * sector_num;
 }
 
+// For L1 data cache
 enum cache_request_status
 data_cache::prefetch_next_nth_sector(mem_fetch *mf,
                                      mem_fetch **new_mf, // return value
@@ -1704,6 +1744,59 @@ data_cache::prefetch_next_nth_sector(mem_fetch *mf,
         return RESERVATION_FAIL;
     }
 
+    mem_access_byte_mask_t new_byte_mask;
+    mem_access_sector_mask_t new_sector_mask;
+    new_addr_type new_addr = get_next_nth_sector_addr(mf, new_sector_mask, new_byte_mask, sector_num);
+
+    const mem_access_t *ma = new mem_access_t(mf->get_access_type(),
+                                              new_addr,
+                                              SECTOR_SIZE,
+                                              mf->is_write(),
+                                              mf->get_access_warp_mask(),
+                                              new_byte_mask,
+                                              new_sector_mask);
+
+    mem_fetch *n_mf = new mem_fetch(*ma,
+                                    NULL,
+                                    mf->get_ctrl_size(),
+                                    mf->get_wid(),
+                                    mf->get_sid(),
+                                    mf->get_tpc(),
+                                    mf->get_mem_config(),
+                                    mf);
+
+    if (new_mf != NULL)
+    {
+        *new_mf = n_mf;
+    }
+
+    assert(n_mf->get_data_size() <= m_config.get_atom_sz());
+    new_addr_type block_addr = m_config.block_addr(n_mf->get_addr());
+    unsigned cache_index = (unsigned) -1;
+    enum cache_request_status probe_status = m_tag_array->probe(block_addr, cache_index, n_mf, true);
+
+    std::list<cache_event> tmp_events;
+    enum cache_request_status access_status
+            = process_tag_probe_using_prefetch_on_miss(wr, probe_status, n_mf->get_addr(), cache_index, n_mf, time,
+                                                       tmp_events);
+
+//    m_stats.inc_stats(n_mf->get_access_type(),
+//                      m_stats.select_stats_status(probe_status, access_status));
+//    m_stats.inc_stats_pw(n_mf->get_access_type(),
+//                         m_stats.select_stats_status(probe_status, access_status));
+
+    return access_status;
+}
+
+// For L2 cache
+enum cache_request_status
+l2_cache::prefetch_next_nth_sector(mem_fetch *mf,
+                                     mem_fetch **new_mf, // return value
+                                     unsigned time,
+                                     std::list<cache_event> &events,
+                                     int sector_num)
+{
+    bool wr = mf->get_is_write();
     mem_access_byte_mask_t new_byte_mask;
     mem_access_sector_mask_t new_sector_mask;
     new_addr_type new_addr = get_next_nth_sector_addr(mf, new_sector_mask, new_byte_mask, sector_num);
@@ -1787,19 +1880,9 @@ l1_cache::access( new_addr_type addr,
                   unsigned time,
                   std::list<cache_event> &events )
 {
-    // fprintf(stdout, "l1_cache::access, address = %llx, sector mask = %s, data size = %d, byte mask = %s \n",
-    //         mf->get_addr(), mf->get_access_sector_mask(), mf->get_data_size(), mf->get_access_byte_mask());
-    // fflush(stdout);
-
-    // std::cout << "l1_cache::access, address = " <<  mf->get_addr();
-    // std::cout << ", sector mask = " <<   mf->get_access_sector_mask();
-    // std::cout << ", data size = = " <<  mf->get_data_size();
-    // std::cout << ", byte mask = " <<  mf->get_access_byte_mask() << std::endl;
-
-
     enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
 
-    switch (DATA_PREFETCH_MODE)
+    switch (L1_DATA_PREFETCH_MODE)
     {
         case ALWAYS_PREFETCH:
             //Always prefetch
@@ -1936,7 +2019,83 @@ l2_cache::access( new_addr_type addr,
                   unsigned time,
                   std::list<cache_event> &events )
 {
-    return data_cache::access( addr, mf, time, events );
+    enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
+
+    switch (L2_DATA_PREFETCH_MODE)
+    {
+        case ALWAYS_PREFETCH:
+            {
+                prefetch_next_nth_sector(mf, NULL, time, events);
+            }
+            break;
+        case PREFETCH_ON_MISS:
+            {
+                if (access_status == MISS) {
+                    //prefetch next block
+                    prefetch_next_nth_sector(mf, NULL, time, events);
+                }
+            }
+            break;
+        case TAGGED_PREFETCH:
+            {
+                new_addr_type block_addr = m_config.block_addr(addr);
+                unsigned cache_index = (unsigned)-1;
+                enum cache_request_status probe_status
+                        = m_tag_array->probe( block_addr, cache_index, mf, true);
+                sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+                assert(block != NULL);
+
+                if (access_status == HIT)
+                {
+                    // prefetched data
+                    if (block->get_tag_bit(mf->get_access_sector_mask()) == false)
+                    {
+                        block->set_tag_bit(true, mf->get_access_sector_mask());
+
+                        //prefetch
+                        mem_fetch* new_mf = NULL;
+                        enum cache_request_status prefetch_status = prefetch_next_nth_sector(mf, &new_mf, time, events);
+                        if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                        {
+                            //set tag to false(0)
+                            new_addr_type block_addr = m_config.block_addr(new_mf->get_addr());
+                            unsigned cache_index = (unsigned)-1;
+                            enum cache_request_status probe_status
+                                    = m_tag_array->probe( block_addr, cache_index, new_mf, true);
+                            sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+                            block->set_tag_bit(false, new_mf->get_access_sector_mask());
+                        }
+                    }
+                }
+                else if (access_status == MISS)
+                {
+                    mem_fetch* new_mf = NULL;
+                    enum cache_request_status prefetch_status = prefetch_next_nth_sector(mf, &new_mf, time, events);
+
+                    if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                    {
+                        //set tag to false(0)
+                        new_addr_type block_addr = m_config.block_addr(new_mf->get_addr());
+                        unsigned cache_index = (unsigned)-1;
+                        enum cache_request_status probe_status
+                                = m_tag_array->probe( block_addr, cache_index, new_mf, true);
+                        sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+                        block->set_tag_bit(false, new_mf->get_access_sector_mask());
+                    }
+                }
+            }
+            break;
+        case STRIDED_PREFETCH:
+            {
+                //TODO
+            }
+            break;
+        default:
+            //No prefetch
+            break;
+    }
+
+    return access_status;
 }
 
 /// Access function for tex_cache
