@@ -1682,6 +1682,7 @@ l2_cache::process_tag_probe_using_prefetch_on_miss(bool wr,
 
     cache_request_status access_status = probe_status;
     if(wr){ // Write
+        return RESERVATION_FAIL; //TODO: remove it
         if(probe_status == HIT){
             // Do nothing
         }else if ( (probe_status != RESERVATION_FAIL) || (probe_status == RESERVATION_FAIL && m_config.m_write_alloc_policy == NO_WRITE_ALLOCATE) ) {
