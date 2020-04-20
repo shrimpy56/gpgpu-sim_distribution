@@ -1732,7 +1732,30 @@ data_cache::prefetch_sector(mem_fetch *mf,
                             unsigned time,
                             std::list<cache_event> &events)
 {
-    enum cache_request_status access_status = HIT;
+    bool wr = mf->get_is_write();
+
+    // We test on Volta GPU architecture, which use NO_WRITE_ALLOCATE policy on write miss
+    // (Simply send write request to lower level memory), so we do not need to prefetch any data.
+    if (wr)
+    {
+        return RESERVATION_FAIL;
+    }
+
+    assert(mf->get_data_size() <= m_config.get_atom_sz());
+    new_addr_type block_addr = m_config.block_addr(mf->get_addr());
+    unsigned cache_index = (unsigned) -1;
+    enum cache_request_status probe_status = m_tag_array->probe(block_addr, cache_index, mf, true);
+
+    std::list<cache_event> tmp_events;
+    enum cache_request_status access_status
+            = process_tag_probe_using_prefetch_on_miss(wr, probe_status, mf->get_addr(), cache_index, mf, time,
+                                                       tmp_events);
+
+//    m_stats.inc_stats(n_mf->get_access_type(),
+//                      m_stats.select_stats_status(probe_status, access_status));
+//    m_stats.inc_stats_pw(n_mf->get_access_type(),
+//                         m_stats.select_stats_status(probe_status, access_status));
+
     return access_status;
 }
 
