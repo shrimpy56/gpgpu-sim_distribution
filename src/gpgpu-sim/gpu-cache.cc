@@ -2058,7 +2058,9 @@ l1_cache::access( new_addr_type addr,
                 else{
                     // update GHB
                     addr_GHB_addr_map[last_miss_addr].push_back(addr);
-                    addr_GHB_mf_map[last_miss_addr].push_back(mf);
+
+                    mem_fetch *n_mf = new mem_fetch(*mf);
+                    addr_GHB_mf_map[last_miss_addr].push_back(n_mf);
 
                     // check size
                     if (addr_GHB_addr_map[last_miss_addr].size() > MAX_GHB_SIZE) {
