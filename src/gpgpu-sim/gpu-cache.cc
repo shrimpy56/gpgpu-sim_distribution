@@ -2050,7 +2050,7 @@ l1_cache::access( new_addr_type addr,
             break;
         case ADDRESS_GHB_PREFETCH:
         {
-            if (access_status == MISS) {
+            if (access_status == MISS || access_status == SECTOR_MISS) {
                 // init_check
                 if (last_miss_addr == 0){
                     last_miss_addr = addr;
@@ -2093,6 +2093,9 @@ l1_cache::access( new_addr_type addr,
                 else{
                     // update GHB
                     long long int delta = abs(addr - last_miss_addr);
+                    // std::cout << "Delta GHB: offset_delta: " << delta << std::endl;
+                    // std::cout << "Delta GHB: offset_delta: " << (unsigned long int) delta << std::endl;
+                    // std::cout << "===========================================" << std::endl;
                     if (delta > 0){
                         delta_GHB_map[last_delta].push_back((unsigned long int) delta);
                         // check size
@@ -2105,11 +2108,14 @@ l1_cache::access( new_addr_type addr,
                             unsigned long int offset_delta = 0;
                             for(auto& buffered_delta : delta_GHB_map[(unsigned long int) delta]){
                                 // find pretech address
+                                
                                 offset_delta += buffered_delta;
+
                                 prefetch_next_nth_sector(mf, NULL, time, events, offset_delta / SECTOR_SIZE);
                             }
                         }
                     }
+                    last_delta = delta;
                     last_miss_addr = addr;
                 }
             }
@@ -2123,7 +2129,7 @@ l1_cache::access( new_addr_type addr,
     return access_status;
 }
 
-const int l1_cache::MAX_GHB_SIZE = 256;
+const int l1_cache::MAX_GHB_SIZE = 32;
 
 // The l2 cache access function calls the base data_cache access
 // implementation.  When the L2 needs to diverge from L1, L2 specific
