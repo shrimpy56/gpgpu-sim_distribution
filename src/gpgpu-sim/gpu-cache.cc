@@ -2005,6 +2005,9 @@ l1_cache::access( new_addr_type addr,
                 }
                 else if (access_status == MISS)
                 {
+                    //set current tag to true
+                    block->set_tag_bit(true, mf->get_access_sector_mask());
+
                     for (int i = 0; i < degree ;++i)
                     {
                         mem_fetch* new_mf = NULL;
