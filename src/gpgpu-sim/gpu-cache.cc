@@ -2026,6 +2026,7 @@ l1_cache::access( new_addr_type addr,
                     }
                     if(StrideTable[HASHPC].state=='T' || StrideTable[HASHPC].state=='S') {
                         //TODO: prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
+                        prefetch_next_nth_sector(mf, NULL, time, events, INSTSTRIDE);
                     }
                 }
                 else       //not found in table
