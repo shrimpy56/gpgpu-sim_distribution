@@ -37,6 +37,7 @@
 
 #include "addrdec.h"
 #include <iostream>
+#include <map>
 
 #define MAX_DEFAULT_CACHE_SIZE_MULTIBLIER 4
 
@@ -46,9 +47,11 @@ enum cache_prefetch_mode {
     PREFETCH_ON_MISS,
     TAGGED_PREFETCH,
     STRIDED_PREFETCH,
+    ADDRESS_GHB_PREFETCH,
+    DELTA_GHB_PREFETCH,
 };
-static enum cache_prefetch_mode L1_DATA_PREFETCH_MODE = PREFETCH_ON_MISS;
-static enum cache_prefetch_mode L2_DATA_PREFETCH_MODE = PREFETCH_ON_MISS;
+static enum cache_prefetch_mode L1_DATA_PREFETCH_MODE = DELTA_GHB_PREFETCH;
+static enum cache_prefetch_mode L2_DATA_PREFETCH_MODE = NO_PREFETCH;
 
 enum cache_block_state {
     INVALID=0,
@@ -1434,9 +1437,15 @@ protected:
                                                        unsigned time,
                                                        std::list<cache_event> &events,
                                                        int sector_num = 1);
+    
+    virtual enum cache_request_status prefetch_sector(mem_fetch *mf,
+                                                       unsigned time,
+                                                       std::list<cache_event> &events);
+
 protected:
     new_addr_type get_next_nth_sector_addr(mem_fetch *mf, mem_access_sector_mask_t& new_sector_mask
             , mem_access_byte_mask_t& new_byte_mask, int sector_num = 1);
+
 
 protected:
     mem_fetch_allocator *m_memfetch_creator;
@@ -1596,7 +1605,11 @@ public:
     l1_cache(const char *name, cache_config &config,
             int core_id, int type_id, mem_fetch_interface *memport,
             mem_fetch_allocator *mfcreator, enum mem_fetch_status status )
-            : data_cache(name,config,core_id,type_id,memport,mfcreator,status, L1_WR_ALLOC_R, L1_WRBK_ACC){}
+            : data_cache(name,config,core_id,type_id,memport,mfcreator,status, L1_WR_ALLOC_R, L1_WRBK_ACC){
+
+                last_miss_addr = 0;
+                last_delta = 0;
+            }
 
     virtual ~l1_cache(){}
 
@@ -1618,6 +1631,16 @@ protected:
     : data_cache( name,
                   config,
                   core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}
+
+    static const int MAX_GHB_SIZE;
+
+    std::map<new_addr_type, std::list<new_addr_type>> addr_GHB_addr_map;
+    std::map<new_addr_type, std::list<mem_fetch *>> addr_GHB_mf_map;
+
+    std::map<unsigned long int, std::list<unsigned long int>> delta_GHB_map;
+    unsigned long int last_delta;
+    new_addr_type last_miss_addr;
+    
 
 };
 

@@ -2576,6 +2576,7 @@ void gpgpu_sim::shader_print_cache_stats( FILE *fout ) const{
         fprintf(fout, "\tL1D_total_cache_pending_hits = %llu\n", total_css.pending_hits);
         fprintf(fout, "\tL1D_total_cache_reservation_fails = %llu\n", total_css.res_fails);
         total_css.print_port_stats(fout, "\tL1D_cache"); 
+        
     }
 
     // L1C

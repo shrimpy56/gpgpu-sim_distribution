@@ -1728,6 +1728,15 @@ new_addr_type data_cache::get_next_nth_sector_addr(mem_fetch *mf, mem_access_sec
     return mf->get_addr() + SECTOR_SIZE * sector_num;
 }
 
+enum cache_request_status
+data_cache::prefetch_sector(mem_fetch *mf,
+                            unsigned time,
+                            std::list<cache_event> &events)
+{
+    enum cache_request_status access_status = HIT;
+    return access_status;
+}
+
 // For L1 data cache
 enum cache_request_status
 data_cache::prefetch_next_nth_sector(mem_fetch *mf,
@@ -2003,6 +2012,71 @@ l1_cache::access( new_addr_type addr,
                 // }
             }
             break;
+        case ADDRESS_GHB_PREFETCH:
+        {
+            if (access_status == MISS) {
+                // init_check
+                if (last_miss_addr == 0){
+                    last_miss_addr = addr;
+                }
+                else{
+                    // update GHB
+                    addr_GHB_addr_map[last_miss_addr].push_back(addr);
+                    addr_GHB_mf_map[last_miss_addr].push_back(mf);
+
+                    // check size
+                    if (addr_GHB_addr_map[last_miss_addr].size() > MAX_GHB_SIZE) {
+                        addr_GHB_addr_map[last_miss_addr].pop_front();
+                        addr_GHB_mf_map[last_miss_addr].pop_front();
+                    }
+
+                    // perform prefetch
+                    if (!addr_GHB_addr_map[addr].empty()){
+                        // prefetch all address in the list;
+
+                        // mem_fetch *buffered_mf;
+
+                        for(auto& buffered_mf : addr_GHB_mf_map[addr]){
+                            prefetch_sector(buffered_mf, time, events);
+                        }
+                    }
+                    last_miss_addr = addr;
+                }
+            }
+        }
+        break;
+        case DELTA_GHB_PREFETCH:
+        {
+            if (access_status == MISS) {
+                // init_check
+                if (last_miss_addr == 0){
+                    last_miss_addr = addr;
+                }
+                else{
+                    // update GHB
+                    long long int delta = addr - last_miss_addr;
+                    if (delta > 0){
+                        delta_GHB_map[last_delta].push_back((unsigned long int) delta);
+                        // check size
+                        if (delta_GHB_map[last_delta].size() > MAX_GHB_SIZE) {
+                            delta_GHB_map[last_delta].pop_front();
+                        }
+                        // perform prefetch
+                        if (!delta_GHB_map[(unsigned long int) delta].empty()){
+                            
+                            unsigned long int offset_delta = 0;
+                            for(auto& buffered_delta : delta_GHB_map[(unsigned long int) delta]){
+                                // find pretech address
+                                offset_delta += buffered_delta;
+                                prefetch_next_nth_sector(mf, NULL, time, events, offset_delta);
+                            }
+                        }
+                    }
+                    last_miss_addr = addr;
+                }
+            }
+        }
+        break;
         default:
             //No prefetch
             break;
@@ -2010,6 +2084,8 @@ l1_cache::access( new_addr_type addr,
 
     return access_status;
 }
+
+const int l1_cache::MAX_GHB_SIZE = 256;
 
 // The l2 cache access function calls the base data_cache access
 // implementation.  When the L2 needs to diverge from L1, L2 specific
