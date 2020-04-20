@@ -1934,6 +1934,8 @@ l1_cache::access( new_addr_type addr,
         case TAGGED_PREFETCH:
             //Tagged prefetch
             {
+                const int degree = 2;
+
                 new_addr_type block_addr = m_config.block_addr(addr);
                 unsigned cache_index = (unsigned)-1;
                 enum cache_request_status probe_status
@@ -1949,9 +1951,31 @@ l1_cache::access( new_addr_type addr,
                         block->set_tag_bit(true, mf->get_access_sector_mask());
 
                         //prefetch
+                        for (int i = 0; i < degree ;++i)
+                        {
+                            mem_fetch* new_mf = NULL;
+                            enum cache_request_status prefetch_status = prefetch_next_nth_sector(mf, &new_mf, time, events, 1+i);
+                            if (prefetch_status != RESERVATION_FAIL)
+                            {
+                                //set tag to false(0)
+                                new_addr_type block_addr = m_config.block_addr(new_mf->get_addr());
+                                unsigned cache_index = (unsigned)-1;
+                                enum cache_request_status probe_status
+                                        = m_tag_array->probe( block_addr, cache_index, new_mf, true);
+                                sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+                                block->set_tag_bit(false, new_mf->get_access_sector_mask());
+                            }
+                        }
+                    }
+                }
+                else if (access_status == MISS)
+                {
+                    for (int i = 0; i < degree ;++i)
+                    {
                         mem_fetch* new_mf = NULL;
-                        enum cache_request_status prefetch_status = prefetch_next_nth_sector(mf, &new_mf, time, events);
-                        if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
+                        enum cache_request_status prefetch_status = prefetch_next_nth_sector(mf, &new_mf, time, events, 1+i);
+
+                        if (prefetch_status != RESERVATION_FAIL)
                         {
                             //set tag to false(0)
                             new_addr_type block_addr = m_config.block_addr(new_mf->get_addr());
@@ -1961,22 +1985,6 @@ l1_cache::access( new_addr_type addr,
                             sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
                             block->set_tag_bit(false, new_mf->get_access_sector_mask());
                         }
-                    }
-                }
-                else if (access_status == MISS)
-                {
-                    mem_fetch* new_mf = NULL;
-                    enum cache_request_status prefetch_status = prefetch_next_nth_sector(mf, &new_mf, time, events);
-
-                    if (prefetch_status != RESERVATION_FAIL && prefetch_status != SECTOR_MISS)
-                    {
-                        //set tag to false(0)
-                        new_addr_type block_addr = m_config.block_addr(new_mf->get_addr());
-                        unsigned cache_index = (unsigned)-1;
-                        enum cache_request_status probe_status
-                                = m_tag_array->probe( block_addr, cache_index, new_mf, true);
-                        sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
-                        block->set_tag_bit(false, new_mf->get_access_sector_mask());
                     }
                 }
             }
@@ -2091,7 +2099,7 @@ l1_cache::access( new_addr_type addr,
                         }
                         // perform prefetch
                         if (!delta_GHB_map[(unsigned long int) delta].empty()){
-                            
+
                             unsigned long int offset_delta = 0;
                             for(auto& buffered_delta : delta_GHB_map[(unsigned long int) delta]){
                                 // find pretech address
