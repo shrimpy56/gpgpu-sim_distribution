@@ -609,7 +609,10 @@ cache_stats::cache_stats(){
 	}
     m_cache_port_available_cycles = 0; 
     m_cache_data_port_busy_cycles = 0; 
-    m_cache_fill_port_busy_cycles = 0; 
+    m_cache_fill_port_busy_cycles = 0;
+
+    m_cache_prefetch_sum = 0;
+    m_cache_prefetch_hit = 0;
 }
 
 void cache_stats::clear(){
@@ -622,7 +625,10 @@ void cache_stats::clear(){
 	}
     m_cache_port_available_cycles = 0; 
     m_cache_data_port_busy_cycles = 0; 
-    m_cache_fill_port_busy_cycles = 0; 
+    m_cache_fill_port_busy_cycles = 0;
+
+    m_cache_prefetch_sum = 0;
+    m_cache_prefetch_hit = 0;
 }
 
 void cache_stats::clear_pw(){
@@ -863,7 +869,10 @@ void cache_stats::get_sub_stats(struct cache_sub_stats &css) const{
 
     t_css.port_available_cycles = m_cache_port_available_cycles; 
     t_css.data_port_busy_cycles = m_cache_data_port_busy_cycles; 
-    t_css.fill_port_busy_cycles = m_cache_fill_port_busy_cycles; 
+    t_css.fill_port_busy_cycles = m_cache_fill_port_busy_cycles;
+
+    t_css.prefetch_hit = m_cache_prefetch_hit;
+    t_css.prefetch_sum = m_cache_prefetch_sum;
 
     css = t_css;
 }
@@ -1661,6 +1670,16 @@ data_cache::process_tag_probe_using_prefetch_on_miss(bool wr,
                                            cache_index,
                                            mf, time, events, probe_status);
 
+        // prefetch accuracy stats
+        if (access_status != RESERVATION_FAIL)
+        {
+            m_stats.inc_prefetch();
+
+            // mark as prefetched
+            sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+            block->mark_as_prefetched(mf->get_access_sector_mask());
+        }
+
     } else {
         //the only reason for reservation fail here is LINE_ALLOC_FAIL (i.e all lines are reserved)
         m_stats.inc_fail_stats(mf->get_access_type(), LINE_ALLOC_FAIL);
@@ -1914,6 +1933,22 @@ l1_cache::access( new_addr_type addr,
 {
     enum cache_request_status access_status = data_cache::access(addr, mf, time, events);
 
+    // prefetch hit stat
+    if (access_status == HIT)
+    {
+        new_addr_type block_addr = m_config.block_addr(addr);
+        unsigned cache_index = (unsigned)-1;
+        enum cache_request_status probe_status
+                = m_tag_array->probe( block_addr, cache_index, mf, true);
+        sector_cache_block* block = dynamic_cast<sector_cache_block*>(m_tag_array->get_block(cache_index));
+        // clear prefetch bit
+        if (block->was_prefetched(mf->get_access_sector_mask()))
+        {
+            block->clear_prefetch_bit(mf->get_access_sector_mask());
+            m_stats.inc_prefetch_hit();
+        }
+    }
+
     switch (L1_DATA_PREFETCH_MODE)
     {
         case ALWAYS_PREFETCH:
@@ -1934,7 +1969,7 @@ l1_cache::access( new_addr_type addr,
         case TAGGED_PREFETCH:
             //Tagged prefetch
             {
-                const int degree = 2;
+                const int degree = 3;
 
                 new_addr_type block_addr = m_config.block_addr(addr);
                 unsigned cache_index = (unsigned)-1;

@@ -268,6 +268,7 @@ struct sector_cache_block : public cache_block_t {
 			m_set_modified_on_fill[i] = false;
 			m_readable[i] = true;
             m_tag_bit[i] = true;
+            m_prefetched[i] = false;
 			}
 			m_line_alloc_time=0;
 			m_line_last_access_time=0;
@@ -297,6 +298,7 @@ struct sector_cache_block : public cache_block_t {
 		m_ignore_on_fill_status[sidx] = false;
 		m_set_modified_on_fill[sidx] = false;
         m_tag_bit[sidx] = true;
+        m_prefetched[sidx] = false;
 
 		//set line stats
 		m_line_alloc_time=time;   //only set this for the first allocated sector
@@ -324,6 +326,7 @@ struct sector_cache_block : public cache_block_t {
 		//m_set_modified_on_fill[sidx] = false;
 		m_readable[sidx] = true;
         m_tag_bit[sidx] = true;
+        m_prefetched[sidx] = false;
 
 		//set line stats
 		m_line_last_access_time=time;
@@ -437,7 +440,7 @@ struct sector_cache_block : public cache_block_t {
     }
 
     // Tagged prefetching getters & setters
-    bool set_tag_bit(bool bit, mem_access_sector_mask_t sector_mask ) {
+    void set_tag_bit(bool bit, mem_access_sector_mask_t sector_mask ) {
         unsigned sidx = get_sector_index(sector_mask);
 
         m_tag_bit[sidx] = bit;
@@ -447,6 +450,23 @@ struct sector_cache_block : public cache_block_t {
 
         return m_tag_bit[sidx];
     }
+
+    void clear_prefetch_bit(mem_access_sector_mask_t sector_mask ) {
+        unsigned sidx = get_sector_index(sector_mask);
+
+        m_prefetched[sidx] = false;
+    }
+    void mark_as_prefetched(mem_access_sector_mask_t sector_mask ) {
+        unsigned sidx = get_sector_index(sector_mask);
+
+        m_prefetched[sidx] = true;
+    }
+    bool was_prefetched(mem_access_sector_mask_t sector_mask ) {
+        unsigned sidx = get_sector_index(sector_mask);
+
+        return m_prefetched[sidx];
+    }
+
 
 private:
     unsigned m_sector_alloc_time[SECTOR_CHUNCK_SIZE];
@@ -460,8 +480,12 @@ private:
     bool m_set_modified_on_fill[SECTOR_CHUNCK_SIZE];
     bool m_readable[SECTOR_CHUNCK_SIZE];
 
+    // prefetch mark
+    bool m_prefetched[SECTOR_CHUNCK_SIZE];
+
     // Tagged prefetching related variables
     bool m_tag_bit[SECTOR_CHUNCK_SIZE];
+
 
     unsigned get_sector_index(mem_access_sector_mask_t sector_mask)
     {
@@ -959,7 +983,10 @@ struct cache_sub_stats{
 
     unsigned long long port_available_cycles; 
     unsigned long long data_port_busy_cycles; 
-    unsigned long long fill_port_busy_cycles; 
+    unsigned long long fill_port_busy_cycles;
+
+    unsigned long long prefetch_hit;
+    unsigned long long prefetch_sum;
 
     cache_sub_stats(){
         clear();
@@ -975,7 +1002,10 @@ struct cache_sub_stats{
         res_fails = 0;
         port_available_cycles = 0; 
         data_port_busy_cycles = 0; 
-        fill_port_busy_cycles = 0; 
+        fill_port_busy_cycles = 0;
+
+        prefetch_hit = 0;
+        prefetch_sum = 0;
     }
     cache_sub_stats &operator+=(const cache_sub_stats &css){
         ///
@@ -991,7 +1021,11 @@ struct cache_sub_stats{
         res_fails += css.res_fails;
         port_available_cycles += css.port_available_cycles; 
         data_port_busy_cycles += css.data_port_busy_cycles; 
-        fill_port_busy_cycles += css.fill_port_busy_cycles; 
+        fill_port_busy_cycles += css.fill_port_busy_cycles;
+
+        prefetch_hit += css.prefetch_hit;
+        prefetch_sum += css.prefetch_sum;
+
         return *this;
     }
 
@@ -1010,7 +1044,11 @@ struct cache_sub_stats{
         ret.res_fails = res_fails + cs.res_fails;
         ret.port_available_cycles = port_available_cycles + cs.port_available_cycles; 
         ret.data_port_busy_cycles = data_port_busy_cycles + cs.data_port_busy_cycles; 
-        ret.fill_port_busy_cycles = fill_port_busy_cycles + cs.fill_port_busy_cycles; 
+        ret.fill_port_busy_cycles = fill_port_busy_cycles + cs.fill_port_busy_cycles;
+
+        ret.prefetch_hit = prefetch_hit + cs.prefetch_hit;
+        ret.prefetch_sum = prefetch_sum + cs.prefetch_sum;
+
         return ret;
     }
 
@@ -1107,7 +1145,11 @@ public:
     // Get per-window cache stats for AerialVision
     void get_sub_stats_pw(struct cache_sub_stats_pw &css) const;
 
-    void sample_cache_port_utility(bool data_port_busy, bool fill_port_busy); 
+    void sample_cache_port_utility(bool data_port_busy, bool fill_port_busy);
+
+    void inc_prefetch() {m_cache_prefetch_sum++;}
+    void inc_prefetch_hit() {m_cache_prefetch_hit++;}
+
 private:
     bool check_valid(int type, int status) const;
     bool check_fail_valid(int type, int fail) const;
@@ -1120,7 +1162,10 @@ private:
 
     unsigned long long m_cache_port_available_cycles; 
     unsigned long long m_cache_data_port_busy_cycles; 
-    unsigned long long m_cache_fill_port_busy_cycles; 
+    unsigned long long m_cache_fill_port_busy_cycles;
+
+    unsigned long long m_cache_prefetch_sum;
+    unsigned long long m_cache_prefetch_hit;
 };
 
 class cache_t {
