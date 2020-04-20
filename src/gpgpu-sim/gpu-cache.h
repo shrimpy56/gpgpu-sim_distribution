@@ -297,8 +297,8 @@ struct sector_cache_block : public cache_block_t {
 		m_status[sidx]=RESERVED;
 		m_ignore_on_fill_status[sidx] = false;
 		m_set_modified_on_fill[sidx] = false;
-        m_tag_bit[sidx] = true;
-        m_prefetched[sidx] = false;
+//        m_tag_bit[sidx] = true;
+//        m_prefetched[sidx] = false;
 
 		//set line stats
 		m_line_alloc_time=time;   //only set this for the first allocated sector
@@ -325,8 +325,8 @@ struct sector_cache_block : public cache_block_t {
 		m_ignore_on_fill_status[sidx] = false;
 		//m_set_modified_on_fill[sidx] = false;
 		m_readable[sidx] = true;
-        m_tag_bit[sidx] = true;
-        m_prefetched[sidx] = false;
+//        m_tag_bit[sidx] = true;
+//        m_prefetched[sidx] = false;
 
 		//set line stats
 		m_line_last_access_time=time;
