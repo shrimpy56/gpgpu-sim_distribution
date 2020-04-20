@@ -1732,7 +1732,30 @@ data_cache::prefetch_sector(mem_fetch *mf,
                             unsigned time,
                             std::list<cache_event> &events)
 {
-    enum cache_request_status access_status = HIT;
+    bool wr = mf->get_is_write();
+
+    // We test on Volta GPU architecture, which use NO_WRITE_ALLOCATE policy on write miss
+    // (Simply send write request to lower level memory), so we do not need to prefetch any data.
+    if (wr)
+    {
+        return RESERVATION_FAIL;
+    }
+
+    assert(mf->get_data_size() <= m_config.get_atom_sz());
+    new_addr_type block_addr = m_config.block_addr(mf->get_addr());
+    unsigned cache_index = (unsigned) -1;
+    enum cache_request_status probe_status = m_tag_array->probe(block_addr, cache_index, mf, true);
+
+    std::list<cache_event> tmp_events;
+    enum cache_request_status access_status
+            = process_tag_probe_using_prefetch_on_miss(wr, probe_status, mf->get_addr(), cache_index, mf, time,
+                                                       tmp_events);
+
+//    m_stats.inc_stats(n_mf->get_access_type(),
+//                      m_stats.select_stats_status(probe_status, access_status));
+//    m_stats.inc_stats_pw(n_mf->get_access_type(),
+//                         m_stats.select_stats_status(probe_status, access_status));
+
     return access_status;
 }
 
@@ -1962,53 +1985,59 @@ l1_cache::access( new_addr_type addr,
             //Strided prefetch
             {
                 // //access_status
-                // address_type INSTPC = mf->get_inst()->pc;
-                // address_type HASHPC = INSTPC & 0X0FFFF;     //lower 16 bits
-                // new_addr_type INSTADDR = addr;
+                address_type INSTPC = mf->get_inst().pc;
+                address_type HASHPC = INSTPC & 0X0FFFF;     //lower 16 bits
+                new_addr_type INSTADDR = addr;
 
-                // if(StrideTable.find(HASHPC)!=StrideTable.end() && StrideTable[HASHPC].pctag==INSTPC)    //found in table
-                // {
-                //     new_addr_type INSTSTRIDE = abs(StrideTable[HASHPC].lastaddr - INSTADDR);
-                //     StrideTable[HASHPC].lastaddr=INSTADDR;
-                //     if(INSTSTRIDE==StrideTable[HASHPC].stride){     //correct
-                //         if(StrideTable[HASHPC].state=='I') {
-                //             StrideTable[HASHPC].state = 'S';
-                //         }
-                //         else if(StrideTable[HASHPC].state=='S') {
-                //             StrideTable[HASHPC].state = 'S';
-                //         }
-                //         else if(StrideTable[HASHPC].state=='N') {
-                //             StrideTable[HASHPC].state = 'T';
-                //         }
-                //         else if(StrideTable[HASHPC].state=='T') {
-                //             StrideTable[HASHPC].state = 'S';
-                //         }
-                //     }
-                //     else{       //incorrect
-                //         if(StrideTable[HASHPC].state=='I') {
-                //             StrideTable[HASHPC].stride=INSTSTRIDE;
-                //             StrideTable[HASHPC].state = 'T';
-                //         }
-                //         else if(StrideTable[HASHPC].state=='S') {
-                //             StrideTable[HASHPC].state = 'I';
-                //         }
-                //         else if(StrideTable[HASHPC].state=='N') {
-                //             StrideTable[HASHPC].stride=INSTSTRIDE;
-                //             StrideTable[HASHPC].state = 'N';
-                //         }
-                //         else if(StrideTable[HASHPC].state=='T') {
-                //             StrideTable[HASHPC].stride=INSTSTRIDE;
-                //             StrideTable[HASHPC].state = 'N';
-                //         }
-                //     }
-                //     if(StrideTable[HASHPC].state=='T' || StrideTable[HASHPC].state=='S')
-                //         //TODO: prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
-                // }
-                // else       //not found in table
-                // {
-                //     struct StrideTableVal newItem = StrideTableVal('I', INSTADDR, 0);
-                //     StrideTable.insert(pair<address_type, StrideTableVal>(HASHPC, newItem));
-                // }
+                if(StrideTable.find(HASHPC)!=StrideTable.end() && StrideTable[HASHPC].pctag==INSTPC)    //found in table
+                {
+                    new_addr_type INSTSTRIDE = abs(StrideTable[HASHPC].lastaddr - INSTADDR);
+                    StrideTable[HASHPC].lastaddr=INSTADDR;
+                    if(INSTSTRIDE==StrideTable[HASHPC].stride){     //correct
+                        if(StrideTable[HASHPC].state=='I') {
+                            StrideTable[HASHPC].state = 'S';
+                        }
+                        else if(StrideTable[HASHPC].state=='S') {
+                            StrideTable[HASHPC].state = 'S';
+                        }
+                        else if(StrideTable[HASHPC].state=='N') {
+                            StrideTable[HASHPC].state = 'T';
+                        }
+                        else if(StrideTable[HASHPC].state=='T') {
+                            StrideTable[HASHPC].state = 'S';
+                        }
+                    }
+                    else{       //incorrect
+                        if(StrideTable[HASHPC].state=='I') {
+                            StrideTable[HASHPC].stride=INSTSTRIDE;
+                            StrideTable[HASHPC].state = 'T';
+                        }
+                        else if(StrideTable[HASHPC].state=='S') {
+                            StrideTable[HASHPC].state = 'I';
+                        }
+                        else if(StrideTable[HASHPC].state=='N') {
+                            StrideTable[HASHPC].stride=INSTSTRIDE;
+                            StrideTable[HASHPC].state = 'N';
+                        }
+                        else if(StrideTable[HASHPC].state=='T') {
+                            StrideTable[HASHPC].stride=INSTSTRIDE;
+                            StrideTable[HASHPC].state = 'N';
+                        }
+                    }
+                    if(StrideTable[HASHPC].state=='T' || StrideTable[HASHPC].state=='S') {
+                        //TODO: prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
+                        prefetch_next_nth_sector(mf, NULL, time, events, INSTSTRIDE);
+                    }
+                }
+                else       //not found in table
+                {
+                    struct StrideTableVal newItem;  // = StrideTableVal(INSTPC, 'I', INSTADDR, 0);
+                    newItem.pctag=INSTPC;
+                    newItem.state='I';
+                    newItem.lastaddr=INSTADDR;
+                    newItem.stride=0;
+                    StrideTable.insert(std::pair<address_type, StrideTableVal>(HASHPC, newItem));
+                }
             }
             break;
         case ADDRESS_GHB_PREFETCH:
