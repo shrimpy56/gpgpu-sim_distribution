@@ -2046,14 +2046,14 @@ l1_cache::access( new_addr_type addr,
         break;
         case DELTA_GHB_PREFETCH:
         {
-            if (access_status == MISS) {
+            if (access_status == MISS || access_status == SECTOR_MISS) {
                 // init_check
                 if (last_miss_addr == 0){
                     last_miss_addr = addr;
                 }
                 else{
                     // update GHB
-                    long long int delta = addr - last_miss_addr;
+                    long long int delta = abs(addr - last_miss_addr);
                     if (delta > 0){
                         delta_GHB_map[last_delta].push_back((unsigned long int) delta);
                         // check size
@@ -2067,7 +2067,7 @@ l1_cache::access( new_addr_type addr,
                             for(auto& buffered_delta : delta_GHB_map[(unsigned long int) delta]){
                                 // find pretech address
                                 offset_delta += buffered_delta;
-                                prefetch_next_nth_sector(mf, NULL, time, events, offset_delta);
+                                prefetch_next_nth_sector(mf, NULL, time, events, offset_delta / SECTOR_SIZE);
                             }
                         }
                     }
