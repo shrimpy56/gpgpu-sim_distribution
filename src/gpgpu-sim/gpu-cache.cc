@@ -1734,13 +1734,17 @@ new_addr_type data_cache::get_next_nth_sector_addr(mem_fetch *mf, mem_access_sec
         , mem_access_byte_mask_t& new_byte_mask, int sector_num) {
 
     int mod = mf->get_addr() % (SECTOR_SIZE * SECTOR_CHUNCK_SIZE);
-
     mod /= SECTOR_SIZE;
+
+    int mask_loc = mod + sector_num;
+    while (mask_loc < 0) mask_loc += SECTOR_CHUNCK_SIZE;
+    mask_loc = mask_loc % SECTOR_CHUNCK_SIZE;
+
     new_sector_mask.reset();
-    new_sector_mask.set((mod + 1) % SECTOR_CHUNCK_SIZE);
+    new_sector_mask.set(mask_loc);
 
     new_byte_mask.reset();
-    for (unsigned k = ((mod + 1) % SECTOR_CHUNCK_SIZE) * SECTOR_SIZE; k < SECTOR_SIZE; ++k)
+    for (unsigned k = mask_loc * SECTOR_SIZE; k < SECTOR_SIZE; ++k)
         new_byte_mask.set(k);
 
     return mf->get_addr() + SECTOR_SIZE * sector_num;
@@ -2037,7 +2041,7 @@ l1_cache::access( new_addr_type addr,
 
                 if(StrideTable.find(HASHPC)!=StrideTable.end() && StrideTable[HASHPC].pctag==INSTPC)    //found in table
                 {
-                    new_addr_type INSTSTRIDE = abs(StrideTable[HASHPC].lastaddr - INSTADDR);
+                    new_addr_type INSTSTRIDE = StrideTable[HASHPC].lastaddr - INSTADDR;
                     StrideTable[HASHPC].lastaddr=INSTADDR;
                     if(INSTSTRIDE==StrideTable[HASHPC].stride){     //correct
                         if(StrideTable[HASHPC].state=='I') {
@@ -2072,7 +2076,9 @@ l1_cache::access( new_addr_type addr,
                     }
                     if(StrideTable[HASHPC].state=='T' || StrideTable[HASHPC].state=='S') {
                         //TODO: prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
-                        prefetch_next_nth_sector(mf, NULL, time, events, INSTSTRIDE / SECTOR_SIZE);
+                        int DEGREE=1;
+                        for(int i=1;i<=DEGREE;i++)
+                            prefetch_next_nth_sector(mf, NULL, time, events, INSTSTRIDE*i / SECTOR_SIZE);
                     }
                 }
                 else       //not found in table
