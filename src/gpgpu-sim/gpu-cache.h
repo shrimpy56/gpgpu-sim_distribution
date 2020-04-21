@@ -1653,9 +1653,10 @@ public:
             int core_id, int type_id, mem_fetch_interface *memport,
             mem_fetch_allocator *mfcreator, enum mem_fetch_status status )
             : data_cache(name,config,core_id,type_id,memport,mfcreator,status, L1_WR_ALLOC_R, L1_WRBK_ACC){
-
-                last_miss_addr = 0;
-                last_delta = 0;
+                for (int i = 0; i < MAX_GHB_SIZE; ++i){
+                    hist_delta_list.push_back(0);
+                    hist_miss_addr_list.push_back(0);
+                }
             }
 
     virtual ~l1_cache(){}
@@ -1680,15 +1681,11 @@ protected:
                   core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}
 
     static const int MAX_GHB_SIZE;
+    static const int MAX_GHB_DEGREE;
 
-    std::map<new_addr_type, std::list<new_addr_type>> addr_GHB_addr_map;
-    std::map<new_addr_type, std::list<mem_fetch *>> addr_GHB_mf_map;
-
-    std::map<unsigned long int, std::list<unsigned long int>> delta_GHB_map;
-    unsigned long int last_delta;
-    new_addr_type last_miss_addr;
-    
-
+    std::list<unsigned long int> hist_delta_list; // length MAX_GHB_SIZE
+    std::list<new_addr_type> hist_miss_addr_list;
+    std::list<mem_fetch *> hist_miss_mf_list;
 };
 
 /// Models second level shared cache with global write-back
