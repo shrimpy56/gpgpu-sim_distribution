@@ -2106,7 +2106,8 @@ l1_cache::access( new_addr_type addr,
                         // look for # degree addr
                         for (int j = 0; j < MAX_GHB_DEGREE; ++j){
                             if (i - (j+1) >= 0) {
-                                tem_addr = *std::next(hist_miss_addr_list.begin(), i - (j+1));
+                                // tem_addr = *std::next(hist_miss_addr_list.begin(), i - (j+1));
+                                // TODO: check mf pointer;
                                 tem_mf = *std::next(hist_miss_mf_list.begin(), i - (j+1));
 
                                 prefetch_mfs.insert(tem_mf);
