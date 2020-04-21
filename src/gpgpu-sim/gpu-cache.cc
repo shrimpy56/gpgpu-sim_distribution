@@ -2137,10 +2137,13 @@ l1_cache::access( new_addr_type addr,
             if (access_status == MISS || access_status == SECTOR_MISS) {
                 // update GHB
                 long long int delta;
-                if (hist_delta_list.front() != 0){
+                if (hist_miss_addr_list.front() != 0){
+                    // std::cout << "current addr: " << addr << "===== last addr: " << hist_miss_addr_list.front() << std::endl;
                     delta = abs(addr - hist_miss_addr_list.front());
+                    // std::cout << "curerent delta: " << delta << std::endl;
+
                     hist_delta_list.push_front((unsigned long int) delta);
-                    hist_delta_list.pop_front();
+                    hist_delta_list.pop_back();
                 }
 
                 hist_miss_addr_list.push_front(addr);
@@ -2148,17 +2151,20 @@ l1_cache::access( new_addr_type addr,
 
                 // check history
                 std::set<unsigned long int> prefetch_offsets;
-                long long int last_delta, tem_delta;
+                long long int last_delta;
                 unsigned long int offset_delta;
                 for (int i = 1; i < MAX_GHB_SIZE; ++i){
                     last_delta = *std::next(hist_delta_list.begin(), i);
+                    // std::cout << "last_delta: " << last_delta << "===== curerent delta: " << delta << std::endl;
                     if (last_delta == delta && last_delta != 0){
                         // look for # degree delta
+                        // std::cout << "find delta!" << std::endl;
                         offset_delta = 0;
                         for (int j = 0; j < MAX_GHB_DEGREE; ++j){
                             if (i - (j+1) >= 0) {
-                                tem_delta = offset_delta + (unsigned long int) *std::next(hist_delta_list.begin(), i - (j+1));
-                                prefetch_offsets.insert(tem_delta);
+                                offset_delta = offset_delta + (unsigned long int) *std::next(hist_delta_list.begin(), i - (j+1));
+                                // std::cout << "insert delta: " << offset_delta << std::endl;
+                                prefetch_offsets.insert(offset_delta);
                             }
                         }
                     }
@@ -2168,6 +2174,7 @@ l1_cache::access( new_addr_type addr,
                 if (!prefetch_offsets.empty()){
                     for(auto& offset : prefetch_offsets){
                         // find pretech address
+                        // std::cout << "perform prefetch!" << std::endl;
                         prefetch_next_nth_sector(mf, NULL, time, events, offset / SECTOR_SIZE);
                     }
                 }
@@ -2183,7 +2190,7 @@ l1_cache::access( new_addr_type addr,
 }
 
 const int l1_cache::MAX_GHB_DEGREE = 2;
-const int l1_cache::MAX_GHB_SIZE = 128;
+const int l1_cache::MAX_GHB_SIZE = 512;
 
 // The l2 cache access function calls the base data_cache access
 // implementation.  When the L2 needs to diverge from L1, L2 specific
