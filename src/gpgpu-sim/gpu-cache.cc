@@ -2041,7 +2041,7 @@ l1_cache::access( new_addr_type addr,
 
                 if(StrideTable.find(HASHPC)!=StrideTable.end() && StrideTable[HASHPC].pctag==INSTPC)    //found in table
                 {
-                    new_addr_type INSTSTRIDE = abs(StrideTable[HASHPC].lastaddr - INSTADDR);
+                    new_addr_type INSTSTRIDE = StrideTable[HASHPC].lastaddr - INSTADDR;
                     StrideTable[HASHPC].lastaddr=INSTADDR;
                     if(INSTSTRIDE==StrideTable[HASHPC].stride){     //correct
                         if(StrideTable[HASHPC].state=='I') {
@@ -2076,7 +2076,9 @@ l1_cache::access( new_addr_type addr,
                     }
                     if(StrideTable[HASHPC].state=='T' || StrideTable[HASHPC].state=='S') {
                         //TODO: prefetch_next_block(INSTADDR+INSTSTRIDE, mf, time, events);
-                        prefetch_next_nth_sector(mf, NULL, time, events, INSTSTRIDE / SECTOR_SIZE);
+                        int DEGREE=1;
+                        for(int i=1;i<=DEGREE;i++)
+                            prefetch_next_nth_sector(mf, NULL, time, events, INSTSTRIDE*i / SECTOR_SIZE);
                     }
                 }
                 else       //not found in table
