@@ -51,7 +51,7 @@ enum cache_prefetch_mode {
     DELTA_GHB_PREFETCH,
 };
 
-static enum cache_prefetch_mode L1_DATA_PREFETCH_MODE = ADDRESS_GHB_PREFETCH;
+static enum cache_prefetch_mode L1_DATA_PREFETCH_MODE = STRIDED_PREFETCH;
 
 static enum cache_prefetch_mode L2_DATA_PREFETCH_MODE = NO_PREFETCH;
 

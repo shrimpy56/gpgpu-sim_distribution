@@ -2117,7 +2117,7 @@ l1_cache::access( new_addr_type addr,
                         for (int j = 0; j < MAX_GHB_DEGREE; ++j){
                             if (i - (j+1) >= 0) {
                                 tem_addr = *std::next(hist_miss_addr_list.begin(), i - (j+1));
-                                prefetch_offsets.insert((long long int) (tem_addr - addr));
+                                prefetch_offsets.insert( (long long int)tem_addr - (long long int)addr);
                                 // TODO: check mf pointer;
                                 // tem_mf = *std::next(hist_miss_mf_list.begin(), i - (j+1));
 
