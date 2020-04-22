@@ -2045,10 +2045,10 @@ l1_cache::access( new_addr_type addr,
                 if (StrideTable.find(HASHPC) != StrideTable.end() &&
                     StrideTable[HASHPC].pctag == INSTPC) //found in table
                 {
-                    long long curr_stride = (INSTADDR - StrideTable[HASHPC].lastaddr) / SECTOR_SIZE;
+                    long long curr_stride = ((long long)INSTADDR - (long long)StrideTable[HASHPC].lastaddr);
                     std::cout << "current pc: " << INSTPC << ", lastaddr: " << StrideTable[HASHPC].lastaddr << ", addr: " << INSTADDR << ", curr_stride:" << curr_stride << std::endl;
 
-                    if (curr_stride > 0)
+                    if (curr_stride != 0)
                     {
                         StrideTable[HASHPC].lastaddr = INSTADDR;
                         if (curr_stride == StrideTable[HASHPC].stride) { //correct
@@ -2074,11 +2074,14 @@ l1_cache::access( new_addr_type addr,
                                 StrideTable[HASHPC].state = 'N';
                             }
                         }
-                    }
-                    if (StrideTable[HASHPC].state == 'T' || StrideTable[HASHPC].state == 'S') {
-                        std::cout << "stride prefetch! pc:" << INSTPC << "===== curr_stride: " << curr_stride << std::endl;
-                        for (int i = 1; i <= DEGREE; i++)
-                            prefetch_next_nth_sector(mf, NULL, time, events, curr_stride * i);
+                        if (StrideTable[HASHPC].state == 'T' || StrideTable[HASHPC].state == 'S') {
+                            std::cout << "stride prefetch! pc:" << INSTPC << "===== curr_stride: " << curr_stride << std::endl;
+                            for (int i = 1; i <= DEGREE; i++) {
+                                int sector_num = curr_stride * i / SECTOR_SIZE;
+                                if (sector_num != 0)
+                                    prefetch_next_nth_sector(mf, NULL, time, events,sector_num);
+                            }
+                        }
                     }
                 } else //not found in table
                 {
