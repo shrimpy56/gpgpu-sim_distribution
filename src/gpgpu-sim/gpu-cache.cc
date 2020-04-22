@@ -2034,12 +2034,12 @@ l1_cache::access( new_addr_type addr,
         case STRIDED_PREFETCH:
             //Strided prefetch
             {
-                const int DEGREE = 3;
+                const int DEGREE = 2;
 
                 //access_status
                 assert(mf->get_pc() != (unsigned) -1);
                 address_type INSTPC = mf->get_pc();
-                address_type HASHPC = INSTPC & 0x4000; //512*SECTOR_SIZE
+                address_type HASHPC = INSTPC & 0x0ffff;
                 new_addr_type INSTADDR = addr;
 
                 if (StrideTable.find(HASHPC) != StrideTable.end() &&
