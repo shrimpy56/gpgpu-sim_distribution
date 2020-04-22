@@ -2034,7 +2034,7 @@ l1_cache::access( new_addr_type addr,
         case STRIDED_PREFETCH:
             //Strided prefetch
             {
-                const int DEGREE = 3;
+                const int DEGREE = 2;
 
                 //access_status
                 assert(mf->get_pc() != (unsigned) -1);
@@ -2045,7 +2045,7 @@ l1_cache::access( new_addr_type addr,
                 if (StrideTable.find(HASHPC) != StrideTable.end() &&
                     StrideTable[HASHPC].pctag == INSTPC) //found in table
                 {
-                    long long curr_stride = ((long long)StrideTable[HASHPC].lastaddr - (long long)INSTADDR);
+                    long long curr_stride = abs((long long)StrideTable[HASHPC].lastaddr - (long long)INSTADDR);
                     // std::cout << "current pc: " << INSTPC << ", lastaddr: " << StrideTable[HASHPC].lastaddr << ", addr: " << INSTADDR << ", curr_stride:" << curr_stride << std::endl;
 
                     if (curr_stride != 0)
@@ -2079,7 +2079,7 @@ l1_cache::access( new_addr_type addr,
                             for (int i = 1; i <= DEGREE; i++) {
                                 int sector_num = curr_stride * i / SECTOR_SIZE;
                                 if (sector_num != 0)
-                                    prefetch_next_nth_sector(mf, NULL, time, events,sector_num);
+                                    prefetch_next_nth_sector(mf, NULL, time, events, sector_num);
                             }
                         }
                     }
