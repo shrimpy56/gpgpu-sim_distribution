@@ -2046,6 +2046,8 @@ l1_cache::access( new_addr_type addr,
                     StrideTable[HASHPC].pctag == INSTPC) //found in table
                 {
                     long long curr_stride = (INSTADDR - StrideTable[HASHPC].lastaddr) / SECTOR_SIZE;
+                    std::cout << "current pc: " << INSTPC << ", lastaddr: " << StrideTable[HASHPC].lastaddr << ", addr: " << INSTADDR << ", curr_stride:" << curr_stride << std::endl;
+
                     if (curr_stride > 0)
                     {
                         StrideTable[HASHPC].lastaddr = INSTADDR;
@@ -2072,10 +2074,11 @@ l1_cache::access( new_addr_type addr,
                                 StrideTable[HASHPC].state = 'N';
                             }
                         }
-                        if (StrideTable[HASHPC].state == 'T' || StrideTable[HASHPC].state == 'S') {
-                            for (int i = 1; i <= DEGREE; i++)
-                                prefetch_next_nth_sector(mf, NULL, time, events, curr_stride * i);
-                        }
+                    }
+                    if (StrideTable[HASHPC].state == 'T' || StrideTable[HASHPC].state == 'S') {
+                        std::cout << "stride prefetch! pc:" << INSTPC << "===== curr_stride: " << curr_stride << std::endl;
+                        for (int i = 1; i <= DEGREE; i++)
+                            prefetch_next_nth_sector(mf, NULL, time, events, curr_stride * i);
                     }
                 } else //not found in table
                 {
