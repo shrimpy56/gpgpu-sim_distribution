@@ -2092,35 +2092,38 @@ l1_cache::access( new_addr_type addr,
                 hist_miss_addr_list.push_front(addr);
                 hist_miss_addr_list.pop_back();
 
-                mem_fetch *n_mf = new mem_fetch(*mf);
-                hist_miss_mf_list.push_front(n_mf);
-                hist_miss_mf_list.pop_back();
+                // mem_fetch *n_mf = new mem_fetch(*mf);
+                // hist_miss_mf_list.push_front(n_mf);
+                // hist_miss_mf_list.pop_back();
 
                 // check history
-                std::set<mem_fetch *> prefetch_mfs;
-                long long int last_addr, tem_addr;
-                mem_fetch * tem_mf;
+                // std::set<mem_fetch *> prefetch_mfs;
+                new_addr_type last_addr, tem_addr;
+                // mem_fetch * tem_mf;
+                std::set<long long int> prefetch_offsets;
                 for (int i = 1; i < MAX_GHB_SIZE; ++i){
                     last_addr = *std::next(hist_miss_addr_list.begin(), i);
                     if (last_addr == addr && last_addr != 0){
                         // look for # degree addr
                         for (int j = 0; j < MAX_GHB_DEGREE; ++j){
                             if (i - (j+1) >= 0) {
-                                // tem_addr = *std::next(hist_miss_addr_list.begin(), i - (j+1));
+                                tem_addr = *std::next(hist_miss_addr_list.begin(), i - (j+1));
+                                prefetch_offsets.insert((long long int) (tem_addr - addr));
                                 // TODO: check mf pointer;
-                                tem_mf = *std::next(hist_miss_mf_list.begin(), i - (j+1));
+                                // tem_mf = *std::next(hist_miss_mf_list.begin(), i - (j+1));
 
-                                prefetch_mfs.insert(tem_mf);
+                                // prefetch_mfs.insert(tem_mf);
                             }
                         }
                     }
                 }
 
                 // perform prefetch
-                if (!prefetch_mfs.empty()){
-                    for(auto& buffered_mf : prefetch_mfs){
+                if (!prefetch_offsets.empty()){
+                    for(auto& buffered_offset : prefetch_offsets){
                         // find pretech address
-                        prefetch_sector(buffered_mf, time, events);
+                        // prefetch_sector(buffered_mf, time, events);
+                        prefetch_next_nth_sector(mf, NULL, time, events, buffered_offset / SECTOR_SIZE);
                     }
                 }
             }
