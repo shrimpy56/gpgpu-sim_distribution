@@ -2046,7 +2046,7 @@ l1_cache::access( new_addr_type addr,
                     StrideTable[HASHPC].pctag == INSTPC) //found in table
                 {
                     long long curr_stride = INSTADDR - StrideTable[HASHPC].lastaddr;
-                    if (curr_stride != 0)
+                    if (curr_stride > 0)
                     {
                         StrideTable[HASHPC].lastaddr = INSTADDR;
                         if (curr_stride == StrideTable[HASHPC].stride) { //correct
