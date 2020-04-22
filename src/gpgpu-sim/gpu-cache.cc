@@ -2045,7 +2045,7 @@ l1_cache::access( new_addr_type addr,
                 if (StrideTable.find(HASHPC) != StrideTable.end() &&
                     StrideTable[HASHPC].pctag == INSTPC) //found in table
                 {
-                    long long curr_stride = ((long long)INSTADDR - (long long)StrideTable[HASHPC].lastaddr);
+                    long long curr_stride = ((long long)StrideTable[HASHPC].lastaddr - (long long)INSTADDR);
                     // std::cout << "current pc: " << INSTPC << ", lastaddr: " << StrideTable[HASHPC].lastaddr << ", addr: " << INSTADDR << ", curr_stride:" << curr_stride << std::endl;
 
                     if (curr_stride != 0)
