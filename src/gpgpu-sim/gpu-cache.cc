@@ -2045,7 +2045,7 @@ l1_cache::access( new_addr_type addr,
                 if (StrideTable.find(HASHPC) != StrideTable.end() &&
                     StrideTable[HASHPC].pctag == INSTPC) //found in table
                 {
-                    long long curr_stride = INSTADDR - StrideTable[HASHPC].lastaddr;
+                    long long curr_stride = (INSTADDR - StrideTable[HASHPC].lastaddr) / SECTOR_SIZE;
                     if (curr_stride > 0)
                     {
                         StrideTable[HASHPC].lastaddr = INSTADDR;
@@ -2074,7 +2074,7 @@ l1_cache::access( new_addr_type addr,
                         }
                         if (StrideTable[HASHPC].state == 'T' || StrideTable[HASHPC].state == 'S') {
                             for (int i = 1; i <= DEGREE; i++)
-                                prefetch_next_nth_sector(mf, NULL, time, events, curr_stride * i / SECTOR_SIZE);
+                                prefetch_next_nth_sector(mf, NULL, time, events, curr_stride * i);
                         }
                     }
                 } else //not found in table
