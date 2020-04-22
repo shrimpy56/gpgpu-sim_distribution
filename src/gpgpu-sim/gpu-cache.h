@@ -1632,7 +1632,7 @@ public:
         address_type pctag;
         char state;
         new_addr_type lastaddr;
-        new_addr_type stride;
+        long long stride;
 //                    StrideTableVal(address_type _pctag, char _state, new_addr_type _lastaddr, new_addr_type _stride) {
 //                       pctag=_pctag;
 //                       state=_state;
