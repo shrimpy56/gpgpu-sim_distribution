@@ -2196,7 +2196,7 @@ l1_cache::access( new_addr_type addr,
 }
 
 const int l1_cache::MAX_GHB_DEGREE = 2;
-const int l1_cache::MAX_GHB_SIZE = 512;
+const int l1_cache::MAX_GHB_SIZE = 128;
 
 // The l2 cache access function calls the base data_cache access
 // implementation.  When the L2 needs to diverge from L1, L2 specific
